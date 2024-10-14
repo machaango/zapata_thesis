@@ -1,17 +1,94 @@
----
-title: "NORS_cleaning"
-output: html_document
----
+## CLEANING
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+
+loading in the database
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(rstatix)
+
+raw = read.csv("/Users/machaango/OneDrive/Desktop/r/thesis/csvs/NORSdata.csv", header = TRUE)
 ```
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+```{r}
+raw %>% group_by(Etiology) %>% 
+  summarize(n = n())
+
+
+```
+
+
+let's clean this dataset!!!
+to do:
+- fix variables
+- fix primary.mode into categorical & rename to make it easier
+- split etiology into 2 variables
+- 1 is etiology (clean)
+- 2 is etiology (expanded)
+
+```{r}
+
+#clean Primary.Mode variable
+raw$Primary.Mode = as.factor(raw$Primary.Mode)
+raw$Primary.Mode = fct_recode(raw$Primary.Mode, "Animal" = "Animal contact", "Interpersonal" = "Person-to-person", "Unknown" = "Indeterminate/unknown", "Environmental" = "Environmental contamination other than food/water")
+#REMINDER: Environmental does NOT include waterborne
+
+```
+
+```{r}
+#create new column in preparation for cleaning the etiology variable
+#move it to the right spot & drop unneeded columns
+refined = raw %>% 
+  mutate(Etiology.Expanded = "",
+         Etiology = na_if(Etiology, "")) %>% 
+  relocate(Etiology.Expanded, .after = Etiology) %>% 
+  select(!c(Food.Contaminated.Ingredient, Animal.Type, Water.Type, Water.Exposure, IFSAC.Category, Food.Vehicle, Serotype.or.Genotype))
+
+```
+
+```{r}
+
+
+#cleaning loop
+for (i in 1:nrow(refined)){
+  string = refined$Etiology[i]
+  
+  na_if(refined$Etiology, "")
+
+  break
+  #this code correctly identifies variables that have a multiple diseases in etiology
+  if (grepl(";", string)==TRUE){
+    refined$Etiology.Expanded[i] = string
+    refined$Etiology[i] = "Multiple"
+  }
+  if (grepl(",", string)==TRUE){
+    refined$Etiology.Expanded[i] = string
+    refined$Etiology[i] = "Multiple"
+  }
+  
+  
+  #string = unlist(strsplit(string, split = ";"))
+  #if(length(string)>1)
+  #  {print(string)}
+  #print(string)
+}
+
+
+```
+
+```{r}
+#i = nchar(refined$Etiology[4])
+#print((i))
+
+print(nchar(refined$Etiology[4]))
+
+```
+
+
+
 
 ```{r cars}
 summary(cars)
