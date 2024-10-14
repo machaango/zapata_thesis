@@ -1,0 +1,10 @@
+name: "site"
+  output_dir: "docs"
+  navbar:
+    title: "Cars"
+    left:
+    - text: "Cleaning"
+        href: cleaning.html
+  output:
+    html_document:
+      theme: cosmo
