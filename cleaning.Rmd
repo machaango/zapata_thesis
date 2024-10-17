@@ -1,105 +1,299 @@
 ## CLEANING
-
-
-loading in the database
-```{r}
-library(dplyr)
-library(ggplot2)
-library(tidyverse)
-library(rstatix)
-
-raw = read.csv("/Users/machaango/OneDrive/Desktop/r/thesis/csvs/NORSdata.csv", header = TRUE)
-```
-
-
-
-```{r}
-raw %>% group_by(Etiology) %>% 
-  summarize(n = n())
-
-
-```
-
-
-let's clean this dataset!!!
-to do:
+goals
 - fix variables
 - fix primary.mode into categorical & rename to make it easier
 - split etiology into 2 variables
 - 1 is etiology (clean)
 - 2 is etiology (expanded)
 
+
+##NOTE: this code uses the new R pipe ( |> ) so rstudio should be updated to 4.1+
+
+load in the database in the database
 ```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(rstatix)
 
-#clean Primary.Mode variable
-raw$Primary.Mode = as.factor(raw$Primary.Mode)
-raw$Primary.Mode = fct_recode(raw$Primary.Mode, "Animal" = "Animal contact", "Interpersonal" = "Person-to-person", "Unknown" = "Indeterminate/unknown", "Environmental" = "Environmental contamination other than food/water")
-#REMINDER: Environmental does NOT include waterborne
-
+raw = read.csv("/Users/machaango/OneDrive/Desktop/thesis/csv_storage/NORSdata.csv", header = TRUE)
 ```
 
+tidying Primary.Mode Variable
+```{r}
+#make variable categorical and rename categories to remove spaces (makes them easier to call)
+raw$Primary.Mode = as.factor(raw$Primary.Mode)
+raw$Primary.Mode = fct_recode(raw$Primary.Mode, "Animal" = "Animal contact", "Interpersonal" = "Person-to-person", "Unknown" = "Indeterminate/unknown", "Environmental" = "Environmental contamination other than food/water")
+#REMINDER: "Environmental" group does NOT include water or food borne infections
+
+print("done!")
+```
+
+prep work for etiology and cleaning columns
 ```{r}
 #create new column in preparation for cleaning the etiology variable
 #move it to the right spot & drop unneeded columns
-refined = raw %>% 
-  mutate(Etiology.Expanded = "",
-         Etiology = na_if(Etiology, "")) %>% 
-  relocate(Etiology.Expanded, .after = Etiology) %>% 
+#also drops values w/unknown or NA etiologys
+refined = raw |>  
+  mutate(Etiology.Expanded = Etiology) |>  
+  relocate(Etiology.Expanded, .after = Etiology) |>  
   select(!c(Food.Contaminated.Ingredient, Animal.Type, Water.Type, Water.Exposure, IFSAC.Category, Food.Vehicle, Serotype.or.Genotype))
 
+
+dropped = refined |> 
+  filter((Etiology == "Unknown") | (Etiology == "")) |> 
+  mutate(Etiology = na_if(Etiology, ""))
+
+
+refined = refined |> 
+  mutate(Etiology = na_if(Etiology,  "")) |> 
+  drop_na(Etiology) |> 
+  filter(Etiology != "Unkown")
+
+
+message("done!")
 ```
 
+
+tidying scrap chunk (code to be moved to labeled chunk once workshopped)
+
+cutting out
+- variants of the same disease (ex. shigella variants)
+- non-contagious diseases (ex. pufferfish neurotoxin)
+- drop n/as and unkown diseases-- we can bring them back later but for now get rid of em
+
+for the vector
+- summary stats on cleaned cleaned data for where people r getting sick
+
 ```{r}
+#before picking out which etiologies to exclude we will label things in prep
 
-
-#cleaning loop
-for (i in 1:nrow(refined)){
+#for each row in the refined dataframe...
+for (i in 1:nrow(refined)){ #REMEMBER i in 1:nrow(refined)
   string = refined$Etiology[i]
+  #save whatever is in that row's Etiology column into a string
   
-  na_if(refined$Etiology, "")
-
-  break
-  #this code correctly identifies variables that have a multiple diseases in etiology
-  if (grepl(";", string)==TRUE){
-    refined$Etiology.Expanded[i] = string
-    refined$Etiology[i] = "Multiple"
+  #we will be splitting these into multiple individual dataframes to deal with individually
+  #for reference: this df uses commas to specify pathogen variants and semicolons to separate multiple pathogens
+  
+  if (grepl(";", string)==TRUE){ #IF there are multiple diseases listed...
+    string = unlist(strsplit(string, split = ";"))
+    string = trimws(string)
+    if(length(unique(string))==1){
+      #if all of the diseases are the same disease, overwrite with just one
+      refined$Etiology[i] = toString(unique(string))
+      refined$Etiology.Expanded[i] = toString(unique(string))
+      }
+    else{
+      #if the diseases are actually different, put "multiple" in etiology field
+      refined$Etiology[i] = "Multiple"
+    }
   }
-  if (grepl(",", string)==TRUE){
-    refined$Etiology.Expanded[i] = string
-    refined$Etiology[i] = "Multiple"
-  }
-  
-  
-  #string = unlist(strsplit(string, split = ";"))
-  #if(length(string)>1)
-  #  {print(string)}
-  #print(string)
 }
 
+message("first loop done!")
+
+#ok NOW we pull out the variables that we don't want
+#pulling out things that are NOT pathogens
+#and kept pathogens are being reduced to their genus
+
+noncontagious = c("Alkaline Water", "Amnesic shellfish poison","Anatoxin-a", "Arsenic", "Bromine", "Chloramines", "Chlordane", "Chlorine", "Chlorine Gas", "Chromium", "Ciguatoxin", "Cleaning agents", "Copper", "Ethylene Glycol", "Fluoride", "Gasoline", "Heavy metals", "Histamine", "Hydrochloric Acid", "Monosodium glutamate (MSG)", "Morpholine", "Neurotoxic shellfish poison","Nitrate","Nitrite", "Oil", "Other", "Other - Chemical/Toxin", "Paralytic shellfish poison", "Pesticides", "Phenol", "Plant/Herbal toxins", "Puffer fish tetrodotoxin", "Scombroid toxin", "Selenium", "Soap/Detergent", "Sodium Hydroxide", "Trichloroethylene", "Unknown - Chemical/Toxin", "ethyl acrylate", "herbicide", "Unknown")
+
+contagious = c("Acanthamoeba", "Astrovirus", "Anisakis", "Bacillus", "Campylobacter", "Clostridium", "Cryptosporidium", "Cyclospora", "Entamoeba", "Enterobacter", "Enterococcus", "Enterovirus", "Escherichia", "Giardia", "Hepatovirus", "Legionella", "Leptospira", "Listeria", "Microcystis", "Mycobacterium", "Naegleria", "Norovirus", "Pantoea", "Plesiomonas", "Providencia", "Pseudomonas", "Rotavirus", "Salmonella", "Sapovirus", "Shigella", "Staphylococcus", "Streptococcus", "Vibrio")
+
+unsure = c("Avian schistosomes", "Cyanotoxin", "Cyanotoxin other", "Cyanotoxin unknown", "Microcoleus lyngbyei", "Mycotoxins", "Other - Bacterium", "Other - Parasite", "Other - Virus", "Unknown - Bacterium", "Unknown - Virus")
+
+drop2 = refined |> filter(Etiology %in% noncontagious | Etiology %in% unsure)
+refined = refined |> filter(!(Etiology %in% noncontagious | Etiology %in% unsure))
+
+for (i in 1:nrow(refined)){ #nrow(refined)
+  string = trimws(refined$Etiology[i])
+  if(string == "Multiple"){
+    next
+  }
+  else if(grepl("Acanthamoeba", string)==TRUE){
+    refined$Etiology[i] = "Acanthamoeba"
+  }
+  else if(grepl("Adenovirus", string)==TRUE){
+    refined$Etiology[i] = "Adenovirus"
+    #adenovirus is not a genus but only one of two genera in the group infect humans
+  }
+  else if(grepl("Bacillus", string)==TRUE){
+    refined$Etiology[i] = "Bacillus"
+  }
+  else if(grepl("Brucella", string)==TRUE){
+    refined$Etiology[i] = "Brucella"
+  }
+  else if(grepl("Campylobacter", string)==TRUE){
+    refined$Etiology[i] = "Campylobacter"
+  }
+  else if(grepl("Clostridium", string)==TRUE){
+    refined$Etiology[i] = "Clostridium"
+  }
+  else if(grepl("Cryptosporidium", string)==TRUE){
+    refined$Etiology[i] = "Cryptosporidium"
+  }
+  else if(grepl("Cyclospora", string)==TRUE){
+    refined$Etiology[i] = "Cyclospora"
+  }
+  else if(grepl("Entamoeba", string)==TRUE){
+    refined$Etiology[i] = "Entamoeba"
+  }
+  else if(grepl("Enterococcus", string)==TRUE){
+    refined$Etiology[i] = "Enterococcus"
+  }
+  else if(grepl("Enterovirus", string)==TRUE){
+    refined$Etiology[i] = "Enterovirus"
+  }
+  else if(grepl("Escherichia", string)==TRUE){
+    refined$Etiology[i] = "Escherichia"
+  }
+  else if(grepl("Giardia", string)==TRUE){
+    refined$Etiology[i] = "Giardia"
+  }
+  else if(grepl("Hepatitis", string)==TRUE){
+    refined$Etiology[i] = "Hepatovirus "
+  }
+  else if(grepl("Legionella", string)==TRUE){
+    refined$Etiology[i] = "Legionella"
+  }
+  else if(grepl("Leptospira", string)==TRUE){
+    refined$Etiology[i] = "Leptospira"
+  }
+  else if(grepl("Listeria", string)==TRUE){
+    refined$Etiology[i] = "Listeria"
+  }
+  else if(grepl("Microcystis", string)==TRUE){
+    refined$Etiology[i] = "Microcystis"
+  }
+  else if(grepl("Mycobacterium", string)==TRUE){
+    refined$Etiology[i] = "Mycobacterium"
+  }
+  else if(grepl("Naegleria", string)==TRUE){
+    refined$Etiology[i] = "Naegleria"
+  }
+  else if(grepl("Norovirus", string)==TRUE){
+    refined$Etiology[i] = "Norovirus"
+  }
+  else if(grepl("Pantoea", string)==TRUE){
+    refined$Etiology[i] = "Pantoea"
+  }
+  else if(grepl("Plesiomonas", string)==TRUE){
+    refined$Etiology[i] = "Plesiomonas"
+  }
+  else if(grepl("Providencia", string)==TRUE){
+    refined$Etiology[i] = "Providencia"
+  }
+  else if(grepl("Pseudomonas", string)==TRUE){
+    refined$Etiology[i] = "Pseudomonas"
+  }
+  else if(grepl("Salmonella", string)==TRUE){
+    refined$Etiology[i] = "Salmonella"
+  }
+  else if(grepl("Sapovirus", string)==TRUE){
+    refined$Etiology[i] = "Sapovirus"
+  }
+  else if(grepl("Shigella", string)==TRUE){
+    refined$Etiology[i] = "Shigella"
+  }
+  else if(grepl("Staphylococcus", string)==TRUE){
+    refined$Etiology[i] = "Staphylococcus"
+  }
+  else if(grepl("Streptococcus", string)==TRUE){
+    refined$Etiology[i] = "Streptococcus"
+  }
+  else if(grepl("Toxoplasma", string)==TRUE){
+    refined$Etiology[i] = "Toxoplasma"
+  }
+  else if(grepl("Trichinella", string)==TRUE){
+    refined$Etiology[i] = "Trichinella"
+  }
+  else if(grepl("Vibrio", string)==TRUE){
+    refined$Etiology[i] = "Vibrio"
+  }
+  else if(grepl("Yersinia", string)==TRUE){
+    refined$Etiology[i] = "Yersinia"
+  }
+  else{
+    next
+  }
+}
+
+message("all done!")
 
 ```
+yippee!!
+
+
 
 ```{r}
-#i = nchar(refined$Etiology[4])
-#print((i))
+refined |> group_by(Etiology) |> 
+  summarize(n = n())
 
-print(nchar(refined$Etiology[4]))
+```
+
+
+
+exploring lists (and counts) of each unique etiology entry to prep for pruning
+```{r}
+
+single_factors = refined |>  
+  filter(!is.na(Etiology)) |> 
+  filter(Etiology != "Multiple")|> 
+  group_by(Etiology) |> 
+  summarize(n = n())
+
+single_factors
+#listed_factors = refined |> 
+#  filter(Etiology == "Multiple") |> 
+#  group_by(Etiology.Expanded) |> 
+#  summarize(n = n())
+
+write.csv(single_factors, "etiologies_single.csv")
+#write.csv(listed_factors, "listed_factors.csv")
 
 ```
 
 
 
 
-```{r cars}
-summary(cars)
+
+```{r}
+
+#are the diseases actually different?
+    refined$Etiology.Expanded[i] = string
+    string = unlist(strsplit(string, split = ";"))
+    #if there are DISEASES multiple listed, separate the list
+    if(length(unique(string) == 1)){
+      refined$Etiology[i] = toString(unique(string))
+    } #if all the different diseases are the same pathogen (ex. salmonella; salmonella), just list one
+    else{refined$Etiology[i] = "Multiple"
+    print("WOMP")}
+    #if there are actually multiple diseases linked, put "multiple" in the etiology field so we can filter it out later
+  }
+
+
+mult = refined |> filter(Etiology == "Multiple")
+for (i in 1:50){ # CHANGE BACK TO  in 1:nrow(mult) to run through all rows
+  string = mult$Etiology.Expanded[i]
+  string = unlist(strsplit(string, split = ";"))
+
+  if (length(string) == 1){
+    print("string")
+  }
+  else{
+    print("weeee")}
+}
+
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+concepts_table <- bind_rows(tab01, tab02, tab03, tab11, tab12, tab13) %>% 
+  rename(concept = Var1,
+         count = Freq)
 
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
+  else if (grepl(",", string)==TRUE){
+    refined$Etiology.Expanded[i] = string
+    refined$Etiology[i] = "Multiple"
+  }
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
