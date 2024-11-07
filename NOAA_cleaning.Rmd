@@ -1,0 +1,16 @@
+
+load in the database in the database
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+
+rawtemp = read.table("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/climdiv-tmpcst-v1.0.0-20241021.txt", header = FALSE)
+```
+
+
+reformat the columns and parse the ID variable
+```{r}
+
+```
+

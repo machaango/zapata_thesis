@@ -9,12 +9,11 @@ goals
 
 ##NOTE: this code uses the new R pipe ( |> ) so rstudio should be updated to 4.1+
 
-load in the database in the database
+load in the database
 ```{r}
 library(dplyr)
 library(ggplot2)
 library(tidyverse)
-library(rstatix)
 
 raw = read.csv("/Users/machaango/OneDrive/Desktop/thesis/csv_storage/NORSdata.csv", header = TRUE)
 ```
@@ -26,7 +25,7 @@ raw$Primary.Mode = as.factor(raw$Primary.Mode)
 raw$Primary.Mode = fct_recode(raw$Primary.Mode, "Animal" = "Animal contact", "Interpersonal" = "Person-to-person", "Unknown" = "Indeterminate/unknown", "Environmental" = "Environmental contamination other than food/water")
 #REMINDER: "Environmental" group does NOT include water or food borne infections
 
-print("done!")
+message("done!")
 ```
 
 prep work for etiology and cleaning columns
@@ -39,16 +38,16 @@ refined = raw |>
   relocate(Etiology.Expanded, .after = Etiology) |>  
   select(!c(Food.Contaminated.Ingredient, Animal.Type, Water.Type, Water.Exposure, IFSAC.Category, Food.Vehicle, Serotype.or.Genotype))
 
+
 #can we move this down to below the cleaning loop?
 dropped = refined |> 
   filter((Etiology == "Unknown") | (Etiology == "")) |> 
   mutate(Etiology = na_if(Etiology, ""))
 
-
 refined = refined |> 
   mutate(Etiology = na_if(Etiology,  "")) |> 
   drop_na(Etiology) |> 
-  filter(Etiology != "Unkown")
+  filter(Etiology != "Unknown")
 
 
 message("done!")
@@ -232,57 +231,10 @@ message("all done!")
 
 ```
 
-save this and then next chunk will read it in so i don't need to run this shit every time
+save this and then next chunk will read it in so i don't need to run this every time
 ```{r}
 
-write.csv(dropped, "dropped.csv")
-write.csv(refined, "refined.csv")
+write.csv(dropped, "data/NORS_dropped.csv")
+write.csv(refined, "data/NORS_refined.csv")
 
 ```
-
-
-```{r}
-
-#refined |>  
-#  group_by(Setting) |> 
-#  summarize(n = n())
-
-#refined |> group_by(Year) |> 
-#  summarize(n = n())
-
-years_test = refined |> group_by(Year) |> 
-  summarize(n = n())
-
-years_test |> ggplot(aes(Year))+
-  geom_histogram(aes(weight = n))
-
-
-
-
-#tbh i'm not even sure how to go about cleaning this
-#what even are relevant categories to divide by?
-
-```
-
-
-
-exploring lists (and counts) of each unique etiology entry to prep for pruning
-```{r}
-
-single_factors = refined |>  
-  filter(!is.na(Etiology)) |> 
-  filter(Etiology != "Multiple")|> 
-  group_by(Etiology) |> 
-  summarize(n = n())
-
-single_factors
-#listed_factors = refined |> 
-#  filter(Etiology == "Multiple") |> 
-#  group_by(Etiology.Expanded) |> 
-#  summarize(n = n())
-
-write.csv(single_factors, "etiologies_single.csv")
-#write.csv(listed_factors, "listed_factors.csv")
-
-```
-
