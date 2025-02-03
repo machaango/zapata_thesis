@@ -5,12 +5,72 @@ library(dplyr)
 library(ggplot2)
 library(tidyverse)
 
-rawtemp = read.table("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/climdiv-tmpcst-v1.0.0-20241021.txt", header = FALSE)
+rawtemp = read.table("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/climdiv-tmpcst-v1.0.0-20241021.txt", header = FALSE, colClasses = c("character",rep("numeric",12)))
+
+
+rawtemp = rawtemp |>
+  rename(ID = V1,
+         Jan = V2,
+         Feb = V3,
+         Mar = V4,
+         Apr = V5,
+         May = V6,
+         June = V7,
+         July = V8,
+         Aug = V9,
+         Sept = V10,
+         Oct = V11,
+         Nov = V12,
+         Dec = V13) |>
+  mutate(StateID = NA,
+         Year = NA) |> 
+  relocate(Year, .after = ID) |> 
+  relocate(StateID, .after = Year)
+
+
+
 ```
 
 
 reformat the columns and parse the ID variable
 ```{r}
 
+for(i in 1:nrow(rawtemp)){
+  id_var = rawtemp$ID[i]
+  rawtemp$StateID[i] = substring(id_var, 1, 3)
+  rawtemp$Year[i] = substring(id_var, 7, 10)
+}
+
+cleaned = rawtemp
+cleaned$Year = as.integer(cleaned$Year)
+
 ```
+
+
+start filtering out
+- years below the correct date-- to match NORS, we will drop all before 1998
+- additionally, missing data is entered in as -99.90 (per the readme)
+- so those become NA
+
+
+```{r}
+
+cleaned = cleaned |> 
+  filter(Year >= 1998) |> 
+  mutate(Oct = na_if(Oct, -99.9),
+         Nov = na_if(Nov, -99.9),
+         Dec = na_if(Dec, -99.9))
+#oct, nov, and dec are the only months with NA values for this time range so we'll just do those
+#i could automate it so that I don't need to change NAs for each month manually
+#but there's more  of a risk of me messing it up so manually it is
+
+
+#this is the extent of the cleaning this data needs considering that most of this is numeric
+#so we will save this to a csv so we can summarize it in the summary markdown
+write.csv(cleaned, "data/NOAA_cleaned.csv")
+
+
+
+```
+
 

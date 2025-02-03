@@ -1,55 +1,107 @@
 
-
-
 ```{r}
-
 library(dplyr)
 library(ggplot2)
 library(tidyverse)
 
-NORS = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/refined.csv", header = TRUE)
+NORS = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/NORS_refined.csv", header = TRUE)
+NOAA = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/NOAA_cleaned.csv", header = TRUE)
 
+#keeps reading in the observation number as a column
+#idk why but i'll just delete it manually
+NOAA$X <- NULL
+NORS$X <- NULL
 ```
 
-
-
-Distribution of observations
+NORS observation distributions (preliminary)
 ```{r}
 #by year
-year_counts = NORS |> group_by(Year) |> 
+NORS_year = NORS |> group_by(Year) |> 
   summarize(n = n())
 
-year_hist = NORS |> group_by(Year) |> 
+#by year HISTOGRAM
+NORS |> group_by(Year) |> 
   summarize(n = n()) |> 
   ggplot(aes(Year))+
   geom_histogram(aes(weight = n))
 
-
-#by state
-state_counts = NORS |> group_by(State) |> 
+NORS_state = NORS |> group_by(State) |> 
   summarize(n = n())
-
-#state_graph = NORS |> group_by(Year) |> 
-#  summarize(n = n()) |> 
-#  ggplot(aes(Year))+
-#  geom_histogram(aes(weight = n))
-
-
-#diseases
-
-#refined |>  
-#  group_by(Setting) |> 
-#  summarize(n = n())
-
-#refined |> group_by(Year) |> 
-#  summarize(n = n())
-
-
 
 #tbh i'm not even sure how to go about cleaning this
 #what even are relevant categories to divide by?
 
+#no decent data until 1998
+#data also ends at 2022 but we will cut it off at 2019 to avoid influence from the pandemic
+
+NORS_cropped = NORS |> 
+  filter(Year >= 1998 & Year <= 2019)
 ```
+
+NORS (updated)
+```{r}
+#NEW by year HISTOGRAM
+NORS_cropped |> group_by(Year) |> 
+  summarize(n = n()) |> 
+  ggplot(aes(Year))+
+  geom_histogram(aes(weight = n), bins = 21)
+
+
+#the amount of reporting is still definitely skewed towards more recent years
+#but we're up to an n factor that I'm not too worried about it?
+
+```
+
+NOAA observations distributions
+```{r}
+#we've already cropped some of the older data from the NOAA dataset
+#but let's be sure we're only looking at 1998-2019
+#starting with 2646 observations in the original dataframe
+
+NOAA_cropped = drop_na(NOAA, c("Oct", "Nov", "Dec"))
+#this drops 98 entries (2548 left)
+#HOWEVER: please note that just filtering by year also drops these entries
+#so the NAs aren't even in our scope and we have full data for the entire timespan
+
+NOAA_cropped = NOAA_cropped |> 
+  filter(Year >= 1998 & Year <= 2019)
+#2156 entries left (dropped 490)
+
+```
+
+
+run this to delete all objects except the most recent datasets
+```{r}
+#NORS variables
+rm(list = c("NORS", "NORS_state", "NORS_year"))
+
+#NOAA variables
+rm(list = c("NOAA"))
+
+```
+
+The NOAA and the NORS data have now been restricted to the same time frame.
+Moving onto summary stats
+NOAA
+- temperature range
+  - change over the decades
+  - variation within a year
+- state coverage
+  - regions?
+  
+NORS
+- disease frequency over time
+  - can we even do this with varying levels of de
+  
+
+NOAA summary stats
+```{r}
+
+
+
+```
+
+
 
 
 
