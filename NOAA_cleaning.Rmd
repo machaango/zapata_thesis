@@ -40,9 +40,13 @@ for(i in 1:nrow(rawtemp)){
   rawtemp$StateID[i] = substring(id_var, 1, 3)
   rawtemp$Year[i] = substring(id_var, 7, 10)
 }
+rm(id_var)
+rm(i)
 
 cleaned = rawtemp
+rm(rawtemp)
 cleaned$Year = as.integer(cleaned$Year)
+cleaned$StateID = as.integer(cleaned$StateID)
 
 ```
 
@@ -54,22 +58,25 @@ start filtering out
 
 
 ```{r}
+#12614 observations as of right now
+cleaned_regions = cleaned |> 
+  filter(StateID <= 109 & StateID >= 101) |>
+  filter(Year >= 1998 & Year <= 2019)
 
-cleaned = cleaned |> 
-  filter(Year >= 1998) |> 
-  mutate(Oct = na_if(Oct, -99.9),
-         Nov = na_if(Nov, -99.9),
-         Dec = na_if(Dec, -99.9))
-#oct, nov, and dec are the only months with NA values for this time range so we'll just do those
-#i could automate it so that I don't need to change NAs for each month manually
-#but there's more  of a risk of me messing it up so manually it is
+#no NA values in this subsection. reduced down to 198 obs w/these filters
+# 9 regions x 22 year period = 198 observations so we're good
 
+cleaned_states = cleaned |> 
+  filter(StateID <= 48) |> 
+  filter(Year >= 1998 & Year <= 2019)
+# 48 states x 22 year period = 1056 observations so all good
 
-#this is the extent of the cleaning this data needs considering that most of this is numeric
-#so we will save this to a csv so we can summarize it in the summary markdown
-write.csv(cleaned, "data/NOAA_cleaned.csv")
+write.csv(cleaned_regions, "data/NOAA_regions.csv", row.names = FALSE)
+write.csv(cleaned_states, "data/NOAA_states.csv", row.names = FALSE)
 
-
+rm(cleaned)
+rm(cleaned_regions)
+rm(cleaned_states)
 
 ```
 

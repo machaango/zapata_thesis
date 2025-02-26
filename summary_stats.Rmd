@@ -64,11 +64,19 @@ NOAA_cropped = drop_na(NOAA, c("Oct", "Nov", "Dec"))
 #so the NAs aren't even in our scope and we have full data for the entire timespan
 
 NOAA_cropped = NOAA_cropped |> 
-  filter(Year >= 1998 & Year <= 2019)
+  filter(Year >= 1998 & Year <= 2019) |> 
+  filter(StateID < 49)
 #2156 entries left (dropped 490)
+#limited stateids to the continental 48
+
+
+NOAA_cropped$StateID <- as.factor(NOAA_cropped$StateID)
+
+NOAA_cropped |> 
+  group_by(StateID) |> 
+  summarize(n = length(StateID))
 
 ```
-
 
 run this to delete all objects except the most recent datasets
 ```{r}
@@ -79,6 +87,7 @@ rm(list = c("NORS", "NORS_state", "NORS_year"))
 rm(list = c("NOAA"))
 
 ```
+
 
 The NOAA and the NORS data have now been restricted to the same time frame.
 Moving onto summary stats
@@ -96,17 +105,107 @@ NORS
 
 NOAA summary stats
 ```{r}
+#NOAA_cropped |>  
+#  group_by(StateID) |> 
+#  summarize(n = n())
+#every region has n = 22 obs meaning that we have good coverage! yippee
 
+NOAA_pivoted = NOAA_cropped |> 
+  pivot_longer(
+    cols = !(c(ID, StateID, Year)),
+    names_to = "Month",
+    values_to = "Temp"
+  )
+#had to pivot the data so that all of the temps are in one column 
+#other columns tell me the corresponding month/year
+NOAA_pivoted$Month = as.factor(NOAA_pivoted$Month)
+#this puts the months in the correct order.
+NOAA_pivoted$Month = fct_relevel(NOAA_pivoted$Month, c("Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sept", "Oct", "Nov", "Dec"))
+
+
+#this graph is useless LMFAO
+#NOAA_pivoted |> 
+#  ggplot(aes(x = Year, y = Temp, color = Month))+
+#  geom_point()+
+#  geom_jitter()
+
+NOAA_pivoted |> 
+  filter(StateID == 33) |> 
+  ggplot(aes(x = Year, y = Temp, color = Month)) +
+  geom_line()
+# this graph is a little less useless-- type in a state and it'll show you the yearly temps
+
+NOAA_pivoted |> 
+  filter(StateID == 12) |> 
+  ggplot(aes(x = Year, y = Temp, color = Month)) +
+  geom_line()
+
+NOAA_pivoted |> 
+  filter(StateID == 32) |> 
+  ggplot(aes(x = Year, y = Temp, color = Month)) +
+  geom_line()
+
+
+
+NOAA_pivoted$Year = as.factor(NOAA_pivoted$Year) 
+
+
+
+
+NOAA_pivoted |> 
+  filter(Year == 1998 | Year == 2019) |> 
+  group_by(Year) |> 
+  ggplot(aes(x = Month, y = Temp, fill = Year))+
+  geom_boxplot()
+
+  #colder winters warmer summers?
+#more variation in more recent years
+
+```
+
+NORS summary stats
+```{r}
+#NORS_cropped |> 
+#  ggplot(aes(x = Year, color = Etiology))+
+#  geom_line(y = )
+
+NORS_counts = NORS_cropped |> 
+  group_by(Year, Etiology) |> 
+  summarize(n = n())
+
+NORS_counts |> 
+  filter(Etiology %in% topetiology$Etiology) |> 
+  ggplot(aes(x = Year, y = n, color = Etiology))+
+  geom_line()
+
+
+```
+
+```{r}
+
+yearcounts = NORS_cropped |> 
+  group_by(Year) |> 
+  summarize(n = n()) |> 
+  arrange(desc(n))
+
+topetiology = NORS_cropped |> 
+  group_by(Etiology) |> 
+  summarize(n = n()) |> 
+  arrange(desc(n)) |> 
+  top_n(6)
+  
 
 
 ```
 
 
 
-
-
 exploring lists (and counts) of each unique etiology entry to prep for pruning
 ```{r}
+
+
+
+
 
 single_factors = refined |>  
   filter(!is.na(Etiology)) |> 
@@ -120,11 +219,19 @@ single_factors
 #  group_by(Etiology.Expanded) |> 
 #  summarize(n = n())
 
-write.csv(single_factors, "etiologies_single.csv")
+#write.csv(single_factors, "etiologies_single.csv")
 #write.csv(listed_factors, "listed_factors.csv")
 
 ```
 
 
-```
+To Do:
+- WRITE
+- normalize outbreaks to reporting? 
+  - convert counts to yearly proportions?
+- finish reading the tmap documentation & create maps for temp across the time
+- keep only state data(?)
+- 
+
+
 
