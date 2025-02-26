@@ -4,12 +4,71 @@ library(ggplot2)
 library(tidyverse)
 library(tseries)
 
+regions_all = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/NOAA_regions_allyears.csv", header = TRUE)
 regions = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/NOAA_regions.csv", header = TRUE)
+
 states = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/NOAA_states.csv", header = TRUE)
+
+regions_all = regions |> filter(Year != 2024)
 
 ```
 
-pivoting both sets + month to numeric
+custom month/date function
+```{r}
+numMonth = function(df){
+  for (i in 1:nrow(df)){ 
+    temp = df$Month[i]
+    if(temp == "Jan"){
+      df$Month[i] = 1
+      }
+    else if(temp == "Feb"){
+      df$Month[i] = 2
+      }
+    else if(temp == "Mar"){
+      df$Month[i] = 3
+      }
+    else if(temp == "Apr"){
+      df$Month[i] = 4
+      }
+    else if(temp == "May"){
+      df$Month[i] = 5
+      }
+    else if(temp == "June"){
+      df$Month[i] = 6
+      }
+    else if(temp == "July"){
+      df$Month[i] = 7
+      }
+    else if(temp == "Aug"){
+      df$Month[i] = 8
+      }
+    else if(temp == "Sept"){
+      df$Month[i] = 9
+      }
+    else if(temp == "Oct"){
+      df$Month[i] = 10
+      }
+    else if(temp == "Nov"){
+      df$Month[i] = 11
+      }
+    else if(temp == "Dec"){
+      df$Month[i] = 12
+      }
+    }
+  
+  rm(i)
+  rm(temp)
+  df$Month = as.integer(df$Month)
+  df$StateID = as.factor(df$StateID)
+  
+  df = df |> mutate(Date2 = as.Date(paste(Year, Month, "01", sep = "-")))
+
+  return(df)
+  }
+
+```
+
+pivoting (regions)
 ```{r}
 rpiv = regions |> 
   pivot_longer(
@@ -17,7 +76,23 @@ rpiv = regions |>
     names_to = "Month",
     values_to = "Temp"
   )
+rpiv = numMonth(rpiv)
 
+```
+
+```{r}
+rpiv_all = regions_all |> 
+  pivot_longer(
+    cols = !(c(ID, StateID, Year)),
+    names_to = "Month",
+    values_to = "Temp"
+  )
+rpiv_all = numMonth(rpiv_all)
+```
+
+
+pivoting (states)
+```{r}
 spiv = states |> 
   pivot_longer(
     cols = !(c(ID, StateID, Year)),
@@ -25,104 +100,9 @@ spiv = states |>
     values_to = "Temp"
   )
 
-pivoted = rpiv 
-for (i in 1:nrow(pivoted)){ 
-  temp = pivoted$Month[i]
-  if(temp == "Jan"){
-    pivoted$Month[i] = 1
-  }
-  else if(temp == "Feb"){
-    pivoted$Month[i] = 2
-  }
-  else if(temp == "Mar"){
-    pivoted$Month[i] = 3
-  }
-  else if(temp == "Apr"){
-    pivoted$Month[i] = 4
-  }
-  else if(temp == "May"){
-    pivoted$Month[i] = 5
-  }
-  else if(temp == "June"){
-    pivoted$Month[i] = 6
-  }
-  else if(temp == "July"){
-    pivoted$Month[i] = 7
-  }
-  else if(temp == "Aug"){
-    pivoted$Month[i] = 8
-  }
-  else if(temp == "Sept"){
-    pivoted$Month[i] = 9
-  }
-  else if(temp == "Oct"){
-    pivoted$Month[i] = 10
-  }
-  else if(temp == "Nov"){
-    pivoted$Month[i] = 11
-  }
-  else if(temp == "Dec"){
-    pivoted$Month[i] = 12
-  }
-}
-rm(i)
-rm(temp)
-pivoted$Month = as.integer(pivoted$Month)
-pivoted$StateID = as.factor(pivoted$StateID)
-rpiv = pivoted
-
-pivoted = spiv
-for (i in 1:nrow(pivoted)){ 
-  temp = pivoted$Month[i]
-  if(temp == "Jan"){
-    pivoted$Month[i] = 1
-  }
-  else if(temp == "Feb"){
-    pivoted$Month[i] = 2
-  }
-  else if(temp == "Mar"){
-    pivoted$Month[i] = 3
-  }
-  else if(temp == "Apr"){
-    pivoted$Month[i] = 4
-  }
-  else if(temp == "May"){
-    pivoted$Month[i] = 5
-  }
-  else if(temp == "June"){
-    pivoted$Month[i] = 6
-  }
-  else if(temp == "July"){
-    pivoted$Month[i] = 7
-  }
-  else if(temp == "Aug"){
-    pivoted$Month[i] = 8
-  }
-  else if(temp == "Sept"){
-    pivoted$Month[i] = 9
-  }
-  else if(temp == "Oct"){
-    pivoted$Month[i] = 10
-  }
-  else if(temp == "Nov"){
-    pivoted$Month[i] = 11
-  }
-  else if(temp == "Dec"){
-    pivoted$Month[i] = 12
-  }
-}
-rm(i)
-rm(temp)
-pivoted$Month = as.integer(pivoted$Month)
-pivoted$StateID = as.factor(pivoted$StateID)
-spiv = pivoted
-
-rpiv = rpiv |> mutate(Date2 = as.Date(paste(Year, Month, "01", sep = "-")))
-
-spiv = spiv |> mutate(Date2 = as.Date(paste(Year, Month, "01", sep = "-")))
-
-rm(pivoted)
+spiv = numMonth(spiv)
 ```
+
 
 create line graph by region
 ```{r}
@@ -134,27 +114,43 @@ rpiv |>
 #can also modify this code to show state time data but it's less interesting bc there's so many
 ```
 
-
-vectorize region temp data for time series analysis
+first time series analysis (dickey fuller and evil stuff)
 ```{r}
-rvector = rpiv |> 
-  group_by(StateID) |> 
-  summarize(
-    temp = list(Temp))
+#temp = unlist(rvec$temp[1])
 
-svector = spiv |> 
+rvec = rpiv |> 
   group_by(StateID) |> 
   summarize(
-    temp = list(Temp))
+    temp = list(Temp),
+    acf = NA,
+    adf = NA,
+    adf.p = NA)
+
+for (i in 1:nrow(rvec)){
+  temp = unlist(rvec$temp[i])
+  acf(temp, lag = 12)
+  pacf(temp, lag = 12)
+  adf.test(temp, k = 48)
+  rvec$adf.p[i] = adf.test(temp, k = 12)$p.value
+
+}
+
+svec = spiv |> 
+  group_by(StateID) |> 
+  summarize(
+    temp = list(Temp),
+    acf = NA,
+    adf.p = NA)
+
+for (i in 1:nrow(svec)){
+  temp = unlist(svec$temp[i])
+  svec$adf.p[i] = adf.test(temp, k = 12)$alternative
+  }
 
 ```
 
 
 ```{r}
-temp = unlist(rvector$temp[2])
-print(pacf(temp,lag=12, plt = TRUE)) 
-#adf.test(temp, k= 6)
-erm = as.vector((acf(temp,lag=12, plt = TRUE))$acf)
-erm
+
 ```
 

@@ -71,13 +71,17 @@ cleaned_states = cleaned |>
   filter(Year >= 1998 & Year <= 2019)
 # 48 states x 22 year period = 1056 observations so all good
 
+cleaned_regions2 = cleaned |> 
+  filter(StateID <= 109 & StateID >= 101) |> 
+  filter(Year != 2024)
+
+write.csv(cleaned_regions2, "data/NOAA_regions_allyears.csv", row.names = FALSE)
 write.csv(cleaned_regions, "data/NOAA_regions.csv", row.names = FALSE)
 write.csv(cleaned_states, "data/NOAA_states.csv", row.names = FALSE)
 
 rm(cleaned)
 rm(cleaned_regions)
 rm(cleaned_states)
+rm(cleaned_regions2)
 
 ```
-
-
