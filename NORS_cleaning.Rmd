@@ -224,7 +224,7 @@ for (i in 1:nrow(refined)){ #nrow(refined)
 }
 
 dropped <- bind_rows(dropped, drop2)
-rm(drop2)
+rm(drop2, contagious, noncontagious, string, unsure)
 
 
 message("all done!")
