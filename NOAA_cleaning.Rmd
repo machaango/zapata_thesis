@@ -5,9 +5,13 @@ library(dplyr)
 library(ggplot2)
 library(tidyverse)
 
-rawtemp = read.table("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/climdiv-tmpcst-v1.0.0-20241021.txt", header = FALSE, colClasses = c("character",rep("numeric",12)))
+rawtemp = read.table("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/tempdata/climdiv-tmpcst-v1.0.0-20241021.txt", header = FALSE, colClasses = c("character",rep("numeric",12)))
 
+rawhum = read.table("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/humdata/climdiv-pcpnst-v1.0.0-20250206.txt", header = FALSE, colClasses = c("character",rep("numeric",12)))
+```
 
+renaming months and moving variables
+```{r}
 rawtemp = rawtemp |>
   rename(ID = V1,
          Jan = V2,
@@ -27,14 +31,31 @@ rawtemp = rawtemp |>
   relocate(Year, .after = ID) |> 
   relocate(StateID, .after = Year)
 
-
+rawhum = rawhum |>
+  rename(ID = V1,
+         Jan = V2,
+         Feb = V3,
+         Mar = V4,
+         Apr = V5,
+         May = V6,
+         June = V7,
+         July = V8,
+         Aug = V9,
+         Sept = V10,
+         Oct = V11,
+         Nov = V12,
+         Dec = V13) |>
+  mutate(StateID = NA,
+         Year = NA) |> 
+  relocate(Year, .after = ID) |> 
+  relocate(StateID, .after = Year)
 
 ```
 
 
 reformat the columns and parse the ID variable
 ```{r}
-
+#TEMPERATURE
 for(i in 1:nrow(rawtemp)){
   id_var = rawtemp$ID[i]
   rawtemp$StateID[i] = substring(id_var, 1, 3)
@@ -43,21 +64,103 @@ for(i in 1:nrow(rawtemp)){
 rm(id_var)
 rm(i)
 
-cleaned = rawtemp
-rm(rawtemp)
-cleaned$Year = as.integer(cleaned$Year)
-cleaned$StateID = as.integer(cleaned$StateID)
+rawtemp$Year = as.integer(rawtemp$Year)
+rawtemp$StateID = as.integer(rawtemp$StateID)
 
+#HUMIDITY
+for(i in 1:nrow(rawhum)){
+  id_var = rawhum$ID[i]
+  rawhum$StateID[i] = substring(id_var, 1, 3)
+  rawhum$Year[i] = substring(id_var, 7, 10)
+}
+rm(id_var)
+rm(i)
+
+rawhum$Year = as.integer(rawhum$Year)
+rawhum$StateID = as.integer(rawhum$StateID)
 ```
 
-
+filters
 start filtering out
 - years below the correct date-- to match NORS, we will drop all before 1998
 - additionally, missing data is entered in as -99.90 (per the readme)
 - so those become NA
 
+custom renaming function (run once)
+```{r}
+stateConvert = function(df){
+  for (i in 1:nrow(df)){
+   if (df$StateID[i] == 108){
+     df$StateID[i] = "Northwest"
+     }
+    else if (df$StateID[i] == 109){
+      df$StateID[i] = "West" 
+    }
+    else if (df$StateID[i] == 107){
+      df$StateID[i] = "Southwest"
+    }
+    else if (df$StateID[i] == 105){
+      df$StateID[i] = "West North Central"
+    }
+    else if (df$StateID[i] == 102){
+      df$StateID[i] = "East North Central"
+    }
+    else if (df$StateID[i] == 103){
+      df$StateID[i] = "Central"
+    }
+    else if (df$StateID[i] == 106){
+      df$StateID[i] = "South"
+    }
+    else if (df$StateID[i] == 104){
+      df$StateID[i] = "Southeast"
+    }
+    else if (df$StateID[i] == 101){
+      df$StateID[i] = "Northeast"
+    }
+  }
+  rm(i)
+  df = rename(df, Region = StateID)
+  return(df)
+}
+```
+
+
+cleaning temp data: dropping out-of-range years and renaming regions to their names
+```{r}
+#TEMPERATURE
+#12614 observations as of right now
+temp = rawtemp |> 
+  filter(StateID <= 109 & StateID >= 101) |>
+  filter(Year >= 1998 & Year <= 2019)
+rm(rawtemp)
+#no NA values in this subsection. reduced down to 198 obs w/these filters
+# 9 regions x 22 year period = 198 observations so we're good
+
+
+#HUMIDITY
+hum = rawhum |> 
+  filter(StateID <= 109 & StateID >= 101) |>
+  filter(Year >= 1998 & Year <= 2019)
+rm(rawhum)
+#same number of observations as temp because it's the same time span and frequency
+
+
+hum = stateConvert(hum)
+temp = stateConvert(temp)
+
+#SAVING STUFF
+write.csv(hum, "data/humdata/hum_reg.csv", row.names = FALSE)
+write.csv(temp, "data/tempdata/temp_reg.csv", row.names = FALSE)
+
+#rm(hum)
+#rm(temp)
+```
+
+
+# DON'T RUN THIS STUFF
 
 ```{r}
+#TEMPERATURE
 #12614 observations as of right now
 cleaned_regions = cleaned |> 
   filter(StateID <= 109 & StateID >= 101) |>
@@ -85,3 +188,32 @@ rm(cleaned_states)
 rm(cleaned_regions2)
 
 ```
+
+```{r}
+#12614 observations as of right now
+cleaned_regions = cleaned |> 
+  filter(StateID <= 109 & StateID >= 101) |>
+  filter(Year >= 1998 & Year <= 2019)
+
+#no NA values in this subsection. reduced down to 198 obs w/these filters
+# 9 regions x 22 year period = 198 observations so we're good
+
+cleaned_states = cleaned |> 
+  filter(StateID <= 48) |> 
+  filter(Year >= 1998 & Year <= 2019)
+# 48 states x 22 year period = 1056 observations so all good
+
+cleaned_regions2 = cleaned |> 
+  filter(StateID <= 109 & StateID >= 101) |> 
+  filter(Year != 2024)
+
+write.csv(cleaned_regions2, "data/humNOAA_regions_allyears.csv", row.names = FALSE)
+write.csv(cleaned_regions, "data/humNOAA_regions.csv", row.names = FALSE)
+write.csv(cleaned_states, "data/humNOAA_states.csv", row.names = FALSE)
+
+rm(cleaned)
+rm(cleaned_regions)
+rm(cleaned_states)
+rm(cleaned_regions2)
+```
+

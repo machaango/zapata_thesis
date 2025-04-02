@@ -2,15 +2,14 @@
 library(dplyr)
 library(ggplot2)
 library(tidyverse)
+library(TTR)
 library(tseries)
 
 regions_all = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/NOAA_regions_allyears.csv", header = TRUE)
 regions = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/NOAA_regions.csv", header = TRUE)
-
-states = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/NOAA_states.csv", header = TRUE)
-
 regions_all = regions |> filter(Year != 2024)
 
+states = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/NOAA_states.csv", header = TRUE)
 ```
 
 custom month/date function
@@ -68,6 +67,8 @@ numMonth = function(df){
 
 ```
 
+
+# DATA MANIPULATION
 pivoting (regions)
 ```{r}
 rpiv = regions |> 
@@ -80,6 +81,7 @@ rpiv = numMonth(rpiv)
 
 ```
 
+pivoting (regions, entire time series)
 ```{r}
 rpiv_all = regions_all |> 
   pivot_longer(
@@ -88,8 +90,13 @@ rpiv_all = regions_all |>
     values_to = "Temp"
   )
 rpiv_all = numMonth(rpiv_all)
-```
 
+rvec = rpiv |> 
+  group_by(StateID) |> 
+  summarize(
+    temp = list(Temp))
+
+```
 
 pivoting (states)
 ```{r}
@@ -104,34 +111,23 @@ spiv = numMonth(spiv)
 ```
 
 
-create line graph by region
-```{r}
-rpiv |> 
-  ggplot(aes(x = Date2, y = Temp, group = 1))+
-  geom_line()+
-  facet_wrap(vars(StateID))
-#this looks good if you make the image really big
-#can also modify this code to show state time data but it's less interesting bc there's so many
-```
-
+# ANALYSIS STUFF
 first time series analysis (dickey fuller and evil stuff)
 ```{r}
-#temp = unlist(rvec$temp[1])
-
 rvec = rpiv |> 
   group_by(StateID) |> 
   summarize(
-    temp = list(Temp),
-    acf = NA,
-    adf = NA,
-    adf.p = NA)
+    temp = list(Temp))
+
+temp = unlist(rvec$temp[1])
+
 
 for (i in 1:nrow(rvec)){
   temp = unlist(rvec$temp[i])
   acf(temp, lag = 12)
   pacf(temp, lag = 12)
   adf.test(temp, k = 48)
-  rvec$adf.p[i] = adf.test(temp, k = 12)$p.value
+  ##rvec$adf.p[i] = adf.test(temp, k = 12)$p.value
 
 }
 
@@ -139,7 +135,6 @@ svec = spiv |>
   group_by(StateID) |> 
   summarize(
     temp = list(Temp),
-    acf = NA,
     adf.p = NA)
 
 for (i in 1:nrow(svec)){
@@ -148,9 +143,77 @@ for (i in 1:nrow(svec)){
   }
 
 ```
-
+simulated non-stationary data
+```{r}
+rpiv2 = rpiv
+for (i in 1:nrow(rpiv2)){
+  fac = rpiv2$Year[i] -1998 
+  rpiv2$Temp[i] = rpiv2$Temp[i] + 0.008
+}
+rm(fac)
+```
 
 ```{r}
+rvec = rpiv2 |> 
+  group_by(StateID) |> 
+  summarize(
+    temp = list(Temp),
+    adf.p = NA)
+
+temp = unlist(rvec$temp[1])
+
+acf(temp, lag = 12)
+pacf(temp, lag = 12)
+adf.test(temp, k = 12)
+
+rpiv2 |> filter(StateID == 101) |> ggplot(aes(x = Date2, y = Temp))+
+  geom_line()
 
 ```
+
+# DECONSTRUCTING
+```{r}
+
+regions_list = c("Northeast","East North Central", "Central", "Southeast", "West North Central", "South", "Southwest", "Northwest", "West Region")
+
+for (i in 1:nrow(rvec)){
+  temp = unlist(rvec$temp[i])
+  tempts = ts(temp, frequency = 12, start = 1998)
+  plot(decompose(tempts))
+  axis(1, at = seq(1998, 2020, by = 2))
+  title(regions_list[i])
+  ##title these for our own sanity
+  }
+
+test = unlist(rvec$temp[3])
+tempts = ts(test, frequency = 12, start = 1998)
+plot.ts(tempts)
+plot(decompose(tempts))
+axis(1, at = seq(1998, 2020, by = 2))
+
+
+
+plot.ts(SMA(tempts, n = 12))
+
+```
+
+
+
+# VISUALIZATION 
+create line graph by region
+```{r}
+rpiv |> 
+  ggplot(aes(x = Date2, y = Temp, group = 1))+
+  geom_line()+
+  facet_wrap(vars(StateID))
+#this looks good if you make the image really big
+#can also modify this code to show state time data but it's less interesting bc there's so many
+#
+rpiv2 |> filter(StateID == 101) |> ggplot(aes(x = Date2, y = Temp))+
+  geom_line()
+```
+
+
+
+
 

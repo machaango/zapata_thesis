@@ -5,7 +5,7 @@ library(ggplot2)
 library(tidyverse)
 
 NORS = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/NORS_refined.csv", header = TRUE)
-NOAA = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/NOAA_cleaned.csv", header = TRUE)
+NOAA = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/tempdata/NOAA_regions.csv", header = TRUE)
 
 #keeps reading in the observation number as a column
 #idk why but i'll just delete it manually
@@ -34,8 +34,25 @@ NORS_state = NORS |> group_by(State) |>
 #no decent data until 1998
 #data also ends at 2022 but we will cut it off at 2019 to avoid influence from the pandemic
 
-NORS_cropped = NORS |> 
+NORS|> group_by(Year) |> 
+  summarize(n = n())
+NORS_cropped|> group_by(Etiology) |> 
+  summarize(n = n())
+
+NORS = NORS |> 
   filter(Year >= 1998 & Year <= 2019)
+
+
+NORS |> count(Etiology) |> 
+  arrange(desc(across(n)))
+
+NORS |> count(Etiology) |> 
+  arrange(desc(across(n)))|>
+  filter(!(Etiology == "Norovirus")) |>
+  filter(!(Etiology == "Salmonella")) |> 
+  head(10) |> 
+  ggplot(aes(x = Etiology, y = n))+
+  geom_col()
 ```
 
 NORS (updated)
@@ -51,6 +68,8 @@ NORS_cropped |> group_by(Year) |>
 #but we're up to an n factor that I'm not too worried about it?
 
 ```
+
+
 
 NOAA observations distributions
 ```{r}

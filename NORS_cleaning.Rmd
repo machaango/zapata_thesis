@@ -231,10 +231,77 @@ message("all done!")
 
 ```
 
+
+dropping non-state and non-continental territories + multiple etiology outbreaks
+```{r}
+refined = refined |> 
+  filter(!(State %in% c("Alaska", "Multistate", "Puerto Rico", "Hawaii", "District of Columbia", "Northern Mariana Islands", "Guam", "Republic of Palau", "Virgin Islands", "Republic of the Marshall Islands"))) |> 
+  filter(Etiology != "Multiple")
+#loss of 1424 non-continental outbreaks
+#and 61 outbreaks in DC
+# plus 1360 outbreaks with multiple etiologies
+dropping = refined |> filter(State %in% c("Alaska", "Multistate", "Puerto Rico", "Hawaii", "District of Columbia", "Northern Mariana Islands", "Guam", "Republic of Palau", "Virgin Islands", "Republic of the Marshall Islands")) |> 
+  filter(Etiology != "Multiple")
+dropped <- bind_rows(dropped, dropping)
+rm(dropping)
+
+```
+
+rename and group states by NOAA region
+```{r}
+northwest = c("Oregon", "Washington", "Idaho")
+west = c("California", "Nevada")
+southwest = c("New Mexico", "Arizona", "Colorado", "Utah")
+west_north_central = c("Montana", "Wyoming", "North Dakota", "South Dakota", "Nebraska")
+east_north_central = c("Minnesota", "Wisconsin", "Michigan", "Iowa")
+central = c("Missouri", "Illinois", "Indiana", "Ohio", "Kentucky", "Tennessee", "West Virginia")
+south = c("Texas", "Oklahoma", "Kansas", "Arkansas", "Louisiana", "Mississippi")
+southeast = c("Alabama", "Georgia", "Florida", "North Carolina", "South Carolina", "Virginia")
+northeast = c("Maryland", "Delaware", "New Jersey", "Connecticut", "Rhode Island", "Pennsylvania", "New York", "Massachusetts", "New Hampshire", "Vermont", "Maine")
+
+for (i in 1:nrow(refined)){
+ if (refined$State[i] %in% northwest){
+   refined$State[i] = "Northwest"
+   }
+  else if (refined$State[i] %in% west){
+    refined$State[i] = "West" 
+  }
+  else if (refined$State[i] %in% southwest){
+    refined$State[i] = "Southwest"
+  }
+  else if (refined$State[i] %in% west_north_central){
+    refined$State[i] = "West North Central"
+  }
+  else if (refined$State[i] %in% east_north_central){
+    refined$State[i] = "East North Central"
+  }
+  else if (refined$State[i] %in% central){
+    refined$State[i] = "Central"
+  }
+  else if (refined$State[i] %in% south){
+    refined$State[i] = "South"
+  }
+  else if (refined$State[i] %in% southeast){
+    refined$State[i] = "Southeast"
+  }
+  else if (refined$State[i] %in% northeast){
+    refined$State[i] = "Northeast"
+  }
+}
+
+rm(i, northwest, west, southwest, west_north_central, east_north_central, central, south, southeast, northeast)
+
+refined = rename(refined, Region = State)
+
+
+```
+
+
+
 save this and then next chunk will read it in so i don't need to run this every time
 ```{r}
 
-write.csv(dropped, "data/NORS_dropped.csv")
-write.csv(refined, "data/NORS_refined.csv")
+write.csv(dropped, "data/NORS_dropped.csv", row.names = FALSE)
+write.csv(refined, "data/NORS_refined.csv", row.names = FALSE)
 
 ```
