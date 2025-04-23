@@ -4,7 +4,16 @@ library(ggplot2)
 library(tidyverse)
 library(forecast)
 library(tseries)
+library(extrafont)
+library(viridis)
 
+theme = theme_set(theme_linedraw())
+theme_update(
+  text=element_text(size=12,  family="Palatino Linotype"),
+  panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                colour = "grey"),
+  panel.grid.minor = element_line(size = 0.5, linetype = 'solid',
+                                colour = "grey"))
 
 
 tem = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/tempdata/temp_reg.csv", header = TRUE)
@@ -13,7 +22,7 @@ NORS = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/NOR
 
 ```
 
-custom month/date function
+custom functions
 ```{r}
 numMonth = function(df){
   for (i in 1:nrow(df)){ 
@@ -67,18 +76,22 @@ numMonth = function(df){
 
 
 slopefxn = function(slope, intercept, val){
-  return((slope*val+intercept))
+  out = (slope*val+intercept)
+  return(out)
 }
 
 subtractingfxn = function(list1, list2){
   return(mapply("-", list1, list2))
 }
+
+
+
 ```
 
 
 pivot and vectorization (change variables)
 ```{r}
-target = "Temperature"
+target = "Humidity"
 if (target == "Humidity"){
   piv = hum
 } else if (target == "Temperature"){
@@ -117,6 +130,37 @@ rm(vec)
 rm(target)
 ```
 
+
+```{r}
+for (i in 1:nrow(hum_vec)){
+  temp = unlist(hum_vec$Humidity[i])
+  tempts = ts(temp, frequency = 12, start = 1998)
+  plot(decompose(tempts))
+  axis(1, at = seq(1998, 2020, by = 2))
+  title(main = hum_vec$Region[i])
+  ##title these for our own sanity
+}
+
+for (i in 1:nrow(hum_vec)){
+  temp = unlist(hum_vec$Humidity[i])
+  #acf(temp, lag = 12)
+  #pacf(temp, lag = 12)
+  #adf.test(temp, k = 48)
+  hum_vec$adf.p[i] = adf.test(temp, k = 12)$p.value
+}
+
+for (i in 1:nrow(temp_vec)){
+  temp = unlist(temp_vec$Temperature[i])
+  tempts = ts(temp, frequency = 12, start = 1998)
+  plot(decompose(tempts))
+  axis(1, at = seq(1998, 2020, by = 2))
+  title(main = temp_vec$Region[i])
+  ##title these for our own sanity
+}
+
+```
+
+
 deconstructing I: are our time series stationary?
 ```{r}
 regions_list = c("Northeast","East North Central", "Central", "Southeast", "West North Central", "South", "Southwest", "Northwest", "West")
@@ -125,11 +169,25 @@ for (i in 1:nrow(temp_vec)){
   temp = unlist(temp_vec$Temperature[i])
   temp_vec$adf.p[i] = adf.test(temp, k = 12)$p.value
 }
+#yes! stationary
 
 for (i in 1:nrow(hum_vec)){
   temp = unlist(hum_vec$Humidity[i])
   hum_vec$adf.p[i] = adf.test(temp, k = 12)$p.value
 }
+
+
+for (i in 1:nrow(hum_vec)){
+  temp = unlist(hum_vec$Humidity[i])
+  tempts = ts(temp, frequency = 12, start = 1998)
+  plot(decompose(tempts))
+  axis(1, at = seq(1998, 2020, by = 2))
+  title(main = hum_vec$Region[i])
+  ##title these for our own sanity
+  # additionally, these are the time series based on the periodicity of the temperature data
+  # however it looks as if there's extra autocrrelation that i'm not accounting for-- el Nino and other meteriological stuff 
+}
+#no! not stationary. we have a trend :D
 
 
 hum_vec = hum_vec |> mutate(
@@ -160,41 +218,52 @@ hum_piv = hum_piv |>
 
 for (i in 1:nrow(hum_piv)){
   if (hum_piv$Region[i] == "Central"){
-    hum_piv$Predicted = slopefxn(hum_vec$Slope[1], hum_vec$Intercept[1], hum_piv$Humidity[i])
+    hum_piv$Predicted[i] = slopefxn(hum_vec$Slope[1], hum_vec$Intercept[1], hum_piv$Humidity[i])
   }
   else if (hum_piv$Region[i] == "East North Central"){
-    hum_piv$Predicted = slopefxn(hum_vec$Slope[2], hum_vec$Intercept[2], hum_piv$Humidity[i])
+    hum_piv$Predicted[i] = slopefxn(hum_vec$Slope[2], hum_vec$Intercept[2], hum_piv$Humidity[i])
   } 
   else if (hum_piv$Region[i] == "Northeast"){
-    hum_piv$Predicted = slopefxn(hum_vec$Slope[3], hum_vec$Intercept[3], hum_piv$Humidity[i])
+    hum_piv$Predicted[i] = slopefxn(hum_vec$Slope[3], hum_vec$Intercept[3], hum_piv$Humidity[i])
   } 
   else if (hum_piv$Region[i] == "Northwest"){
-    hum_piv$Predicted = slopefxn(hum_vec$Slope[4], hum_vec$Intercept[4], hum_piv$Humidity[i])
+    hum_piv$Predicted[i] = slopefxn(hum_vec$Slope[4], hum_vec$Intercept[4], hum_piv$Humidity[i])
   } 
   else if (hum_piv$Region[i] == "South"){
-    hum_piv$Predicted = slopefxn(hum_vec$Slope[5], hum_vec$Intercept[5], hum_piv$Humidity[i])
+    hum_piv$Predicted[i] = slopefxn(hum_vec$Slope[5], hum_vec$Intercept[5], hum_piv$Humidity[i])
   } 
   else if (hum_piv$Region[i] == "Southeast"){
-    hum_piv$Predicted = slopefxn(hum_vec$Slope[6], hum_vec$Intercept[6], hum_piv$Humidity[i])
+    hum_piv$Predicted[i] = slopefxn(hum_vec$Slope[6], hum_vec$Intercept[6], hum_piv$Humidity[i])
   } 
   else if (hum_piv$Region[i] == "Southwest"){
-    hum_piv$Predicted = slopefxn(hum_vec$Slope[7], hum_vec$Intercept[7], hum_piv$Humidity[i])
+    hum_piv$Predicted[i] = slopefxn(hum_vec$Slope[7], hum_vec$Intercept[7], hum_piv$Humidity[i])
   } 
   else if (hum_piv$Region[i] == "West"){
-    hum_piv$Predicted = slopefxn(hum_vec$Slope[8], hum_vec$Intercept[8], hum_piv$Humidity[i])
+    hum_piv$Predicted[i] = slopefxn(hum_vec$Slope[8], hum_vec$Intercept[8], hum_piv$Humidity[i])
   } 
   else if (hum_piv$Region[i] == "West North Central"){
-    hum_piv$Predicted = slopefxn(hum_vec$Slope[9], hum_vec$Intercept[9], hum_piv$Humidity[i])
+    hum_piv$Predicted[i] = slopefxn(hum_vec$Slope[9], hum_vec$Intercept[9], hum_piv$Humidity[i])
   } 
   else{
     stop("idk what happened")
   }
 }
+
+hum_piv = hum_piv |> mutate(
+  Adjusted = Humidity-Predicted
+)
+
 hum_piv |> 
-  ggplot(aes(x = Date2))+
-  geom_line(y = Predicted)+
+  ggplot(aes(x = Date2, y = Humidity))+
+  geom_line()+
+  geom_line(aes(y = Adjusted), color = "blue")+
   facet_wrap(vars(Region))+
   geom_smooth(method = lm, color = "red")
+
+
+#not entirely sure I did this right
+#regardless, the point of this was to extract and look at the slopes (which I have)
+#i tried making it stationary so we can rejoin the temp dataset but alas.
 
 #see? we've got slopes!
 
@@ -203,29 +272,6 @@ hum_piv |>
 #all humidity are somewhat significant (NOT stationary)
 #except for West North Central Region which is the most landlocked?
 ```
-
-
-detrending humidity w/linear equation
-```{r}
-hum_vec = hum_vec |> mutate(
-  Predicted = ,
-  Corrected = 0)
-
-for (i in 1:nrow(hum_vec)){
-  temp = unlist(hum_vec$Humidity)
-  apply()
-  
-  temp_df = hum_piv |> filter(Region == regions_list[i])
-  model = lm(Humidity ~ Date2, data = temp_df)
-
-  hum_vec$Intercept[i] = model$coef[[1]]
-  hum_vec$Slope[i] = model$coef[[2]]
-  hum_vec$SE = summary(model)$coef[[4]] 
-
-}
-
-```
-
 
 deconstructing II (visual time series) - needs vectorized versions
 ```{r}
@@ -262,34 +308,9 @@ temp_piv |>
 
 ```
 
-deconstructing III
-```{r}
-library(tseries)
-for (i in 1:nrow(hum_vec)){
-  temp = unlist(hum_vec$Humidity[i])
-  tempts = ts(temp, frequency = 12, start = 1998)
-  plot(decompose(tempts))
-  axis(1, at = seq(1998, 2020, by = 2))
-  title(main = hum_vec$Region[i])
-  ##title these for our own sanity
-}
-
-
-for (i in 1:nrow(hum_vec)){
-  temp = unlist(hum_vec$Humidity[i])
-  #acf(temp, lag = 12)
-  #pacf(temp, lag = 12)
-  #adf.test(temp, k = 48)
-  hum_vec$adf.p[i] = adf.test(temp, k = 12)$p.value
-
-}
-```
-
-
 chi test stuff + graph
 ```{r}
-
-low_counts = NORS |> group_by(Etiology) |> count() |> arrange(n) |> filter(n < 10)
+low_counts = NORS |> group_by(Etiology) |> count() |> arrange(n) |> filter(n < 15)
 low_counts = low_counts$Etiology
 
 chitest1 = NORS |> 
@@ -298,31 +319,301 @@ chitest1 = NORS |>
   pivot_wider(names_from = Region, values_from = n, values_fill = 0)
 
 chitest2 = chitest1 |> ungroup() |> select(!(Etiology))
-
 #https://stats.stackexchange.com/questions/159057/alternatives-for-chi-squared-test-for-independence-for-tables-more-than-2-x-2
 chisq.test(chitest2, simulate.p.value = TRUE) #the nature of this test means that it's testing the RELATIVE proportion-- it assumes that the spread overall is what matters and not differing expected counts between groups
 #i think that's what that means?
+#regardless it's actually running a fisher's exact test to account for low values
 
 ## VISUALS
 ## total proportion
-NORS |> filter(!(Etiology %in% low_counts | Etiology == "Multiple")) |> ggplot(aes(x = Region, fill = Etiology))+
+NORS |> filter(!(Etiology %in% low_counts | Etiology == "Norovirus")) |> ggplot(aes(x = Region, fill = Etiology))+
   geom_bar(position = "stack")
 
 # relative proportion
-NORS |> filter(!(Etiology %in% low_counts | Etiology == "Multiple")) |> ggplot(aes(x = Region, fill = Etiology))+
+NORS |> filter(!(Etiology %in% low_counts|Etiology == "Norovirus")) |> ggplot(aes(x = Region, fill = Etiology))+
   geom_bar(position = "fill")
 
 rm(low_counts, chitest1, chitest2)
 ```
 
-
-
+checking hot/cold months
 ```{r}
+temp_piv |> 
+  ggplot(aes(x = Month, y = Temperature, color = Year))+
+  geom_point(alpha = 0.5)+
+  scale_x_continuous(breaks=seq(1,12,1))+
+  facet_wrap(vars(Region))+
+  labs(title = "Monthly Temperature (°F) by Region")+
+  scale_color_viridis(option="viridis")
+ggsave("./figures/temp_monthly.png")
+# hottest months: june, july, aug
+# coldest months: jan, feb, dec
+
+hum_piv |> 
+  ggplot(aes(x = Month, y = Humidity, color = Year))+
+  geom_point(alpha = 0.5)+
+  scale_x_continuous(breaks=seq(1,12,1))+
+  facet_wrap(vars(Region))+
+  labs(title = "Monthly Precipitation (inches) by Region")+
+  scale_color_viridis(option="viridis")
+ggsave("./figures/precip_monthly.png")
+
+  
+#each region has its own unique humidity pattern
+```
+
+prepping NORS for proportion comparisons
+```{r}
+#NORS |> filter(!(Etiology %in% low_counts | Etiology == "Norovirus")) |> group_by(Etiology) |> count()
+#NORS|> group_by(Etiology) |> count()
+low_counts = NORS |> group_by(Etiology) |> count() |> arrange(n) |> filter(n < 15)
+low_counts = low_counts$Etiology
+
+NORS2 = NORS |> 
+  select(c(Year, Month, Region, Etiology)) |> 
+  mutate(Type = "low count",
+         Special_Temp = "none", 
+         Section = 0)
+NORS2 = numMonth(NORS2)
+NORS2 = NORS2 |> rename(Date = Date2)
+
+for (i in 1:nrow(NORS2)){
+  if (NORS2$Month[i] <= 8 & NORS2$Month[i] >= 6){
+    NORS2$Special[i] =  "hot"
+  }
+  if (NORS2$Month[i] <= 2 | NORS2$Month[i] == 12){
+    NORS2$Special[i] = "cold"
+  }
+}
+
+for (i in 1:nrow(NORS2)){
+  if (NORS2$Month[i] <= 8 & NORS2$Month[i] >= 6){
+    NORS2$Special[i] =  "hot"
+  }
+  if (NORS2$Month[i] <= 2 | NORS2$Month[i] == 12){
+    NORS2$Special[i] = "cold"
+  }
+}
+
+
+for (i in 1:nrow(NORS2)){
+  if (NORS2$Etiology[i] == "Acanthamoeba"){
+    NORS2$Type[i] = "Parasite/Amoeba"
+  }
+  else if (NORS2$Etiology[i] == "Adenovirus"){
+    NORS2$Type[i] = "Virus"
+  }
+  else if (NORS2$Etiology[i] == "Anisakis"){
+    NORS2$Type[i] = "Parasite/Amoeba"
+  }
+  else if (NORS2$Etiology[i] == "Astrovirus"){
+    NORS2$Type[i] = "Virus"
+  }
+  else if (NORS2$Etiology[i] == "Bacillus"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Brucella"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Campylobacter"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Clostridium"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Cryptosporidium"){
+    NORS2$Type[i] = "Parasite/Amoeba"
+  }
+  else if (NORS2$Etiology[i] == "Cyclospora"){
+    NORS2$Type[i] = "Parasite/Amoeba"
+  }
+  else if (NORS2$Etiology[i] == "Enterobacter"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Enterococcus"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Escherichia"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Giardia"){
+    NORS2$Type[i] = "Parasite/Amoeba"
+  }
+  else if (NORS2$Etiology[i] == "Hepatovirus "){
+    NORS2$Type[i] = "Virus"
+  }
+  else if (NORS2$Etiology[i] == "Legionella"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Leptospira"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Listeria"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Microcystis"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Mycobacterium"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Naegleria"){
+    NORS2$Type[i] = "Parasite/Amoeba"
+  }
+  else if (NORS2$Etiology[i] == "Norovirus"){
+    NORS2$Type[i] = "Virus"
+  }
+  else if (NORS2$Etiology[i] == "Pantoea"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Plesiomonas"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Providencia"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Pseudomonas"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Rotavirus"){
+    NORS2$Type[i] = "Virus"
+  }
+  else if (NORS2$Etiology[i] == "Salmonella"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Sapovirus"){
+    NORS2$Type[i] = "Virus"
+  }
+  else if (NORS2$Etiology[i] == "Shigella"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Staphylococcus"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Streptococcus"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Toxoplasma"){
+    NORS2$Type[i] = "Parasite/Amoeba"
+  }
+  else if (NORS2$Etiology[i] == "Trichinella"){
+    NORS2$Type[i] = "Parasite/Amoeba"
+  }
+  else if (NORS2$Etiology[i] == "Vibrio"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Yersinia"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else{
+    message(NORS2$Etiology[i])
+  }
+}
+
+
+NORS_lite = NORS2 |> filter(!(Etiology %in% low_counts | Etiology == "Norovirus"))
+
+
+message("all done!")
+```
+
+
+proportions by year and region
+```{r}
+#example of formatted stuff
+temp_piv |> 
+  ggplot(aes(x = Month, y = Temperature, color = Year))+
+  geom_point(alpha = 0.5)+
+  scale_x_continuous(breaks=seq(1,12,1))+
+  facet_wrap(vars(Region))+
+  labs(title = "Monthly Temperature (°F) by Region")+
+  scale_color_viridis(option="viridis")
+ggsave("./figures/temp_monthly.png")
+# in this case we can't drop the loest etiologies because of how the disease is working-- many different types of virus make up the cold season but most hot month infections are caused by the same pathogen
+# also. several amoeba groups are like. sort of parasitic sort of not (parasite has its own definition) but they have been grouped here 
+
+# HOT/COLD x TYPE
+NORS2 |> filter(Special != "none") |> 
+  ggplot(aes(x = Special, fill = Type))+
+  geom_bar(position = "stack")+
+  facet_wrap(vars(Region))
+
+NORS_lite |> filter(Special != "none") |> 
+  ggplot(aes(x = Special, fill = Type))+
+  geom_bar(position = "stack")+
+  facet_wrap(vars(Region))
+
+
+# HOT/COLD x ETIOLOGY (stacked)
+NORS2 |> filter(Special != "none") |> 
+  ggplot(aes(x = Special, fill = Etiology))+
+  geom_bar(position = "stack")+
+  facet_wrap(vars(Region))
+
+NORS_lite |> filter(Special != "none") |> 
+  ggplot(aes(x = Special, fill = Etiology))+
+  geom_bar(position = "stack")+
+  facet_wrap(vars(Region))
+
+# HOT/COLD x ETIOLOGY (proportion)
+NORS2 |> filter(Special != "none") |> 
+  ggplot(aes(x = Special, fill = Etiology))+
+  geom_bar(position = "fill")+
+  facet_wrap(vars(Region))
+
+NORS_lite |> filter(Special != "none") |> 
+  ggplot(aes(x = Special, fill = Etiology))+
+  geom_bar(position = "fill")+
+  facet_wrap(vars(Region))
 
 
 
 
+NORS2 |> 
+  ggplot(aes(x = Month, fill = Type))+
+  geom_bar(position = "stack")+
+  facet_wrap(vars(Region))+
+  ggtitle("Type x Month by Region (full)")
+
+NORS_lite |> 
+  ggplot(aes(x = Month, fill = Type))+
+  geom_bar(position = "stack")+
+  facet_wrap(vars(Region))+
+  ggtitle("Type x Month by Region (lite)")
+
+temp_piv |> 
+  ggplot(aes(x = Month, y = Temperature, color = Year))+
+  geom_point()+
+  facet_wrap(vars(Region))+
+  ggtitle("Temperature x Month by Region")
+# hottest months: june, july, aug
+# coldest months: jan, feb, dec
+
+hum_piv |> 
+  ggplot(aes(x = Month, y = Humidity, color = Year))+
+  geom_point()+
+  facet_wrap(vars(Region))+
+  ggtitle("Humidity x Month by Region")+
+  theme(text=element_text(size=12,  family="Palatino Linotype"))
 
 
 ```
+
+
+```{r}
+NORS_props = NORS2 |> group_by(Year, Region, Etiology) |> add_count()
+NORS_props = NORS_props |> 
+  ungroup() |> 
+  group_by(Year, Region) |> 
+  add_count(wt = n) |> 
+  rename(indiv_count = n,
+         total_count = nn) |> 
+  mutate(prop = indiv_count/total_count)
+
+
+
+
+# humidity etiology -- disease
+```
+
 

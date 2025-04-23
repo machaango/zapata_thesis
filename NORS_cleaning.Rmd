@@ -156,7 +156,7 @@ for (i in 1:nrow(refined)){ #nrow(refined)
     refined$Etiology[i] = "Giardia"
   }
   else if(grepl("Hepatitis", string)==TRUE){
-    refined$Etiology[i] = "Hepatovirus "
+    refined$Etiology[i] = "Hepatovirus"
   }
   else if(grepl("Legionella", string)==TRUE){
     refined$Etiology[i] = "Legionella"
@@ -231,7 +231,6 @@ message("all done!")
 
 ```
 
-
 dropping non-state and non-continental territories + multiple etiology outbreaks
 ```{r}
 refined = refined |> 
@@ -246,6 +245,7 @@ dropped <- bind_rows(dropped, dropping)
 rm(dropping)
 
 ```
+
 
 rename and group states by NOAA region
 ```{r}
@@ -291,16 +291,26 @@ for (i in 1:nrow(refined)){
 
 rm(i, northwest, west, southwest, west_north_central, east_north_central, central, south, southeast, northeast)
 
-refined = rename(refined, Region = State)
+```
 
+drop outbreaks outside of time range
+```{r}
+
+alltime = refined
+dropping = refined |> filter(Year < 1998 | Year > 2019)
+refined = refined |> filter(Year >= 1998 & Year <= 2019)
+# 41658 obs to 36783 obs; dropping 4875 obs outside of time range 
+dropped = bind_rows(dropped, dropping)
+rm(dropping)
+
+refined = rename(refined, Region = State)
 
 ```
 
 
-
-save this and then next chunk will read it in so i don't need to run this every time
+save the data
 ```{r}
-
+write.csv(dropped, "data/NORS_alltime.csv", row.names = FALSE)
 write.csv(dropped, "data/NORS_dropped.csv", row.names = FALSE)
 write.csv(refined, "data/NORS_refined.csv", row.names = FALSE)
 
