@@ -1,25 +1,38 @@
 ```{r}
 library(dplyr)
-library(ggplot2)
 library(tidyverse)
-library(forecast)
+#library(forecast)
 library(tseries)
+library(ggplot2)
+#library(ggplotify)
+library(knitr)
 library(extrafont)
 library(viridis)
+```
 
+load in data
+```{r}
+temper = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/tempdata/temp_reg.csv", header = TRUE)
+precip = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/precipdata/hum_reg.csv", header = TRUE)
+NORS = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/NORS_refined.csv", header = TRUE)
+
+regions_list = c("Central","East North Central", "Northeast", "Northwest", "South", "Southeast", "Southwest", "West", "West North Central")
+
+```
+
+visual theme settings (run only once)
+```{r}
 theme = theme_set(theme_linedraw())
 theme_update(
   text=element_text(size=12,  family="Palatino Linotype"),
-  panel.grid.major = element_line(size = 0.5, linetype = 'solid',
-                                colour = "grey"),
-  panel.grid.minor = element_line(size = 0.5, linetype = 'solid',
-                                colour = "grey"))
-
-
-tem = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/tempdata/temp_reg.csv", header = TRUE)
-hum = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/humdata/hum_reg.csv", header = TRUE)
-NORS = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/NORS_refined.csv", header = TRUE)
-
+  panel.grid.major = element_line(
+    size = 0.5, 
+    linetype = 'solid',
+    colour = "grey"),
+  panel.grid.minor = element_line(
+    size = 0.5, 
+    linetype = 'solid',
+    colour = "grey"))
 ```
 
 custom functions
@@ -88,14 +101,13 @@ subtractingfxn = function(list1, list2){
 
 ```
 
-
-pivot and vectorization (change variables)
+pivot and vectorization (change variable based on need)
 ```{r}
-target = "Humidity"
-if (target == "Humidity"){
-  piv = hum
+target = "Temperature"
+if (target == "Precipitation"){
+  piv = precip
 } else if (target == "Temperature"){
-  piv = tem 
+  piv = temper
 } else {
   stop("change top line of code!")
   }
@@ -109,13 +121,13 @@ piv = piv |>
   select(!("ID"))
 piv = numMonth(piv)
 
-if (target == "Humidity"){
+if (target == "Precipitation"){
   vec = piv |> 
   group_by(Region) |> 
   summarize(
-    Humidity = list(Humidity))
-  hum_piv = piv
-  hum_vec = vec
+    Precipitation = list(Precipitation))
+  precip_piv = piv
+  precip_vec = vec
 } else if (target == "Temperature"){
   vec = piv |> 
   group_by(Region) |> 
@@ -125,72 +137,216 @@ if (target == "Humidity"){
   temp_vec = vec
 }
 
-rm(piv)
-rm(vec)
-rm(target)
+rm(piv, vec, target)
 ```
-
-
-```{r}
-for (i in 1:nrow(hum_vec)){
-  temp = unlist(hum_vec$Humidity[i])
-  tempts = ts(temp, frequency = 12, start = 1998)
-  plot(decompose(tempts))
-  axis(1, at = seq(1998, 2020, by = 2))
-  title(main = hum_vec$Region[i])
-  ##title these for our own sanity
-}
-
-for (i in 1:nrow(hum_vec)){
-  temp = unlist(hum_vec$Humidity[i])
-  #acf(temp, lag = 12)
-  #pacf(temp, lag = 12)
-  #adf.test(temp, k = 48)
-  hum_vec$adf.p[i] = adf.test(temp, k = 12)$p.value
-}
-
-for (i in 1:nrow(temp_vec)){
-  temp = unlist(temp_vec$Temperature[i])
-  tempts = ts(temp, frequency = 12, start = 1998)
-  plot(decompose(tempts))
-  axis(1, at = seq(1998, 2020, by = 2))
-  title(main = temp_vec$Region[i])
-  ##title these for our own sanity
-}
-
-```
-
 
 deconstructing I: are our time series stationary?
 ```{r}
-regions_list = c("Northeast","East North Central", "Central", "Southeast", "West North Central", "South", "Southwest", "Northwest", "West")
-
 for (i in 1:nrow(temp_vec)){
   temp = unlist(temp_vec$Temperature[i])
-  temp_vec$adf.p[i] = adf.test(temp, k = 12)$p.value
+  temp_vec$ADF_pval[i] = adf.test(temp, k = 12)$p.value
 }
 #yes! stationary
 
-for (i in 1:nrow(hum_vec)){
-  temp = unlist(hum_vec$Humidity[i])
-  hum_vec$adf.p[i] = adf.test(temp, k = 12)$p.value
+for (i in 1:nrow(precip_vec)){
+  temp = unlist(precip_vec$Precipitation[i])
+  precip_vec$ADF_pval[i] = adf.test(temp, k = 12)$p.value
 }
+#not stationary?
+
+temp = temp_vec |> select(Region, ADF_pval)
+tibble(temp)
+temp = precip_vec |> select(Region, ADF_pval)
+tibble(temp)
+rm(temp)
+
+```
 
 
-for (i in 1:nrow(hum_vec)){
-  temp = unlist(hum_vec$Humidity[i])
+
+deconstructing II: visualizing the time series decomp (table)
+```{r}
+# path names for when these are saved
+regions_paths_precip = c(
+  "./figures/timeseries_decomp/precip_decomp_Central.png",
+  "./figures/timeseries_decomp/precip_decomp_EastNorthCentral.png", 
+  "./figures/timeseries_decomp/precip_decomp_Northeast.png",
+  "./figures/timeseries_decomp/precip_decomp_Northwest.png",
+  "./figures/timeseries_decomp/precip_decomp_South.png",
+  "./figures/timeseries_decomp/precip_decomp_Southeast.png",
+  "./figures/timeseries_decomp/precip_decomp_Southwest.png",
+  "./figures/timeseries_decomp/precip_decomp_West.png",
+  "./figures/timeseries_decomp/precip_decomp_WestNorthCentral.png")
+
+regions_paths_temper = c(
+  "./figures/timeseries_decomp/temper_decomp_Central.png",
+  "./figures/timeseries_decomp/temper_decomp_EastNorthCentral.png", 
+  "./figures/timeseries_decomp/temper_decomp_Northeast.png",
+  "./figures/timeseries_decomp/temper_decomp_Northwest.png",
+  "./figures/timeseries_decomp/temper_decomp_South.png",
+  "./figures/timeseries_decomp/temper_decomp_Southeast.png",
+  "./figures/timeseries_decomp/temper_decomp_Southwest.png",
+  "./figures/timeseries_decomp/temper_decomp_West.png",
+  "./figures/timeseries_decomp/temper_decomp_WestNorthCentral.png")
+
+
+# plotting and saving precipitation data
+for (i in 1:nrow(precip_vec)){
+  #doing the decomposition
+  temp = unlist(precip_vec$Precipitation[i])
   tempts = ts(temp, frequency = 12, start = 1998)
-  plot(decompose(tempts))
-  axis(1, at = seq(1998, 2020, by = 2))
-  title(main = hum_vec$Region[i])
-  ##title these for our own sanity
-  # additionally, these are the time series based on the periodicity of the temperature data
-  # however it looks as if there's extra autocrrelation that i'm not accounting for-- el Nino and other meteriological stuff 
+  saveplot = decompose(tempts)
+  
+  #plot label prep
+  plot_subtitle = paste(regions_list[i], "Region Precipitation Data")
+
+  #making the plot
+  autoplot(saveplot, range.bars = FALSE)+
+    scale_x_continuous(breaks = c(1998, 2000, 2002, 2004, 2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020))+
+    scale_y_continuous(minor_breaks = NULL)+
+    xlab("Year")+
+    labs(title = "Time Series Decomposition",
+         subtitle = plot_subtitle)
+  ggsave(regions_paths_precip[i], height = 5, width = 7)
+  
+  #no! not stationary. we have a trend :D
+  #additionally, these are the time series based on the periodicity of the temperature data
+  #however it looks as if there's extra autocorrelation that i'm not accounting for-- el Nino and other meteorological stuff 
 }
-#no! not stationary. we have a trend :D
 
 
-hum_vec = hum_vec |> mutate(
+# and doing the same for the temperature data
+for (i in 1:nrow(temp_vec)){
+  #doing the decomposition
+  temp = unlist(temp_vec$Temperature[i])
+  tempts = ts(temp, frequency = 12, start = 1998)
+  saveplot = decompose(tempts)
+  
+  #plot label prep
+  plot_subtitle = paste(regions_list[i], "Region Temperature Data")
+
+  #making the plot
+  autoplot(saveplot, range.bars = FALSE)+
+    scale_x_continuous(breaks = c(1998, 2000, 2002, 2004, 2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020))+
+    scale_y_continuous(minor_breaks = NULL)+
+    xlab("Year")+
+    labs(title = "Time Series Decomposition",
+         subtitle = plot_subtitle)
+  ggsave(regions_paths_temper[i], height = 5, width = 7)
+}
+
+
+#NOTES
+#all temp are nonsignificant (stationary)
+#all Precipitation are somewhat significant (NOT stationary)
+#except for West North Central Region which is the most landlocked?
+
+# clean up the environment
+rm(regions_paths_precip, regions_paths_temper, temp, tempts, saveplot, plot_subtitle, i)
+```
+
+raw timeseries by region (plot)
+```{r}
+precip_signif = precip_piv |> filter(Region != "West North Central")
+
+precip_piv |> 
+  ggplot(aes(x = Date2, y = Precipitation))+
+  geom_line()+
+  facet_wrap(vars(Region))+
+  geom_smooth(data = precip_signif, method = lm, color = 'red3')+
+  xlab("Year")+
+  labs(title = "Monthly Precipitation (in) by Region")
+ggsave("./figures/precip_region.png", height = 4, width = 8)
+
+temp_piv |> 
+  group_by(Region) |> 
+  mutate(avg_temp = mean(Temperature)) |> 
+  ggplot(aes(x = Date2, y = Temperature))+
+  geom_line()+
+  #geom_segment(aes(x = as.Date('1998-01-01'), xend = as.Date('2019-12-01'), y = avg_temp, yend = avg_temp), color = 'blue')+
+  facet_wrap(vars(Region))+
+  xlab("Year")+
+  labs(title = "Monthly Temperature (°F) by Region")
+ggsave("./figures/temper_region.png", height = 4, width = 8)
+
+rm(precip_signif)
+```
+
+extracting average value for all ts and slope+intercept for significant ts (table)
+```{r}
+temp_vec = temp_vec |> mutate(Avg = 0)
+precip_vec = precip_vec |> mutate(Avg = 0,
+                                  Slope = 0,
+                                  Intercept = 0,
+                                  Slope_P = 0)
+
+for (i in 1:nrow(temp_vec)){
+  temp = unlist(temp_vec$Temperature[i])
+  temp_vec$Avg[i] = mean(temp)
+  }
+
+for (i in 1:nrow(precip_vec)){
+  temp = unlist(precip_vec$Precipitation[i])
+  precip_vec$Avg[i] = mean(temp)
+
+  if (precip_vec$Region[i] != "West North Central"){
+    precip_vec$Slope[i] = coef(model)[2]
+    precip_vec$Intercept[i] = coef(model)[1]
+    precip_vec$Pval[i] = summary(model)$coefficients[2,4] 
+    }
+}
+
+temp = temp_vec |> select(!(c(ADF_pval, Temperature)))
+tibble(temp)
+temp = precip_vec |> select(!(c(ADF_pval, Precipitation)))
+tibble(temp)
+
+rm(temp)
+```
+
+trying to save autocorrelation plots
+```{r}
+for (i in 1:nrow(precip_vec)){
+  temp = unlist(precip_vec$Precipitation[i])
+  acf(temp)
+  #pacf(temp, lag = 12)
+  #adf.test(temp, k = 48)
+  #precip_vec$adf.p[i] = adf.test(temp, k = 12)$p.value
+}
+
+
+
+for (i in 1:nrow(precip_vec)){
+  temp = unlist(precip_vec$Precipitation[i])
+  acf_saved = acf(temp, plot = FALSE)
+  plot(acf_saved)
+  acf_df <- with(acf_saved, data.frame(lag, acf))
+
+  acf_df |> ggplot(mapping = aes(x = lag, y = acf))+
+    geom_hline(aes(yintercept = 0))+
+    geom_segment(mapping = aes(xend = lag, yend = 0))
+  #pacf(temp, lag = 12)
+  #adf.test(temp, k = 48)
+  #precip_vec$adf.p[i] = adf.test(temp, k = 12)$p.value
+}
+
+bacf <- acf(x, plot = FALSE)
+bacfdf <- with(bacf, data.frame(lag, acf))
+
+q <- ggplot(data = bacfdf, mapping = aes(x = lag, y = acf)) +
+       geom_hline(aes(yintercept = 0)) +
+       geom_segment(mapping = aes(xend = lag, yend = 0))
+
+
+
+
+```
+
+
+
+tried adjusting the non-stationary time series to be stationary (non-functional script)
+```{r}
+precip_vec = precip_vec |> mutate(
   Intercept = 0,
   Slope = 0,
   SE = 0, 
@@ -198,115 +354,81 @@ hum_vec = hum_vec |> mutate(
   Adjusted = 0
 )
 
-for (i in 1:nrow(hum_vec)){
-  temp_df = hum_piv |> filter(Region == regions_list[i])
-  model = lm(Humidity ~ Date2, data = temp_df)
+for (i in 1:nrow(precip_vec)){
+  temp_df = precip_piv |> filter(Region == regions_list[i])
+  model = lm(Precipitation ~ Date2, data = temp_df)
 
-  hum_vec$Intercept[i] = model$coef[[1]]
-  hum_vec$Slope[i] = model$coef[[2]]
-  hum_vec$SE = summary(model)$coef[[4]] 
+  precip_vec$Intercept[i] = model$coef[[1]]
+  precip_vec$Slope[i] = model$coef[[2]]
+  precip_vec$SE = summary(model)$coef[[4]] 
   
-  temp = unlist(hum_vec$Humidity[i])
-  hum_vec$Predicted[i] = list(lapply(temp, slopefxn, model$coef[[2]], model$coef[[1]]))
+  temp = unlist(precip_vec$Precipitation[i])
+  precip_vec$Predicted[i] = list(lapply(temp, slopefxn, model$coef[[2]], model$coef[[1]]))
   
-  temp2 = unlist(hum_vec$Predicted[i])
-  hum_vec$Adjusted[i] = list(mapply("-", temp, temp2))
+  temp2 = unlist(precip_vec$Predicted[i])
+  precip_vec$Adjusted[i] = list(mapply("-", temp, temp2))
 }
 
-hum_piv = hum_piv |> 
+precip_piv = precip_piv |> 
   mutate(Predicted = 0)
 
-for (i in 1:nrow(hum_piv)){
-  if (hum_piv$Region[i] == "Central"){
-    hum_piv$Predicted[i] = slopefxn(hum_vec$Slope[1], hum_vec$Intercept[1], hum_piv$Humidity[i])
+for (i in 1:nrow(precip_piv)){
+  if (precip_piv$Region[i] == "Central"){
+    precip_piv$Predicted[i] = slopefxn(precip_vec$Slope[1], precip_vec$Intercept[1], precip_piv$Precipitation[i])
   }
-  else if (hum_piv$Region[i] == "East North Central"){
-    hum_piv$Predicted[i] = slopefxn(hum_vec$Slope[2], hum_vec$Intercept[2], hum_piv$Humidity[i])
+  else if (precip_piv$Region[i] == "East North Central"){
+    precip_piv$Predicted[i] = slopefxn(precip_vec$Slope[2], precip_vec$Intercept[2], precip_piv$Precipitation[i])
   } 
-  else if (hum_piv$Region[i] == "Northeast"){
-    hum_piv$Predicted[i] = slopefxn(hum_vec$Slope[3], hum_vec$Intercept[3], hum_piv$Humidity[i])
+  else if (precip_piv$Region[i] == "Northeast"){
+    precip_piv$Predicted[i] = slopefxn(precip_vec$Slope[3], precip_vec$Intercept[3], precip_piv$Precipitation[i])
   } 
-  else if (hum_piv$Region[i] == "Northwest"){
-    hum_piv$Predicted[i] = slopefxn(hum_vec$Slope[4], hum_vec$Intercept[4], hum_piv$Humidity[i])
+  else if (precip_piv$Region[i] == "Northwest"){
+    precip_piv$Predicted[i] = slopefxn(precip_vec$Slope[4], precip_vec$Intercept[4], precip_piv$Precipitation[i])
   } 
-  else if (hum_piv$Region[i] == "South"){
-    hum_piv$Predicted[i] = slopefxn(hum_vec$Slope[5], hum_vec$Intercept[5], hum_piv$Humidity[i])
+  else if (precip_piv$Region[i] == "South"){
+    precip_piv$Predicted[i] = slopefxn(precip_vec$Slope[5], precip_vec$Intercept[5], precip_piv$Precipitation[i])
   } 
-  else if (hum_piv$Region[i] == "Southeast"){
-    hum_piv$Predicted[i] = slopefxn(hum_vec$Slope[6], hum_vec$Intercept[6], hum_piv$Humidity[i])
+  else if (precip_piv$Region[i] == "Southeast"){
+    precip_piv$Predicted[i] = slopefxn(precip_vec$Slope[6], precip_vec$Intercept[6], precip_piv$Precipitation[i])
   } 
-  else if (hum_piv$Region[i] == "Southwest"){
-    hum_piv$Predicted[i] = slopefxn(hum_vec$Slope[7], hum_vec$Intercept[7], hum_piv$Humidity[i])
+  else if (precip_piv$Region[i] == "Southwest"){
+    precip_piv$Predicted[i] = slopefxn(precip_vec$Slope[7], precip_vec$Intercept[7], precip_piv$Precipitation[i])
   } 
-  else if (hum_piv$Region[i] == "West"){
-    hum_piv$Predicted[i] = slopefxn(hum_vec$Slope[8], hum_vec$Intercept[8], hum_piv$Humidity[i])
+  else if (precip_piv$Region[i] == "West"){
+    precip_piv$Predicted[i] = slopefxn(precip_vec$Slope[8], precip_vec$Intercept[8], precip_piv$Precipitation[i])
   } 
-  else if (hum_piv$Region[i] == "West North Central"){
-    hum_piv$Predicted[i] = slopefxn(hum_vec$Slope[9], hum_vec$Intercept[9], hum_piv$Humidity[i])
+  else if (precip_piv$Region[i] == "West North Central"){
+    precip_piv$Predicted[i] = slopefxn(precip_vec$Slope[9], precip_vec$Intercept[9], precip_piv$Precipitation[i])
   } 
   else{
     stop("idk what happened")
   }
 }
 
-hum_piv = hum_piv |> mutate(
-  Adjusted = Humidity-Predicted
+precip_piv = precip_piv |> mutate(
+  Adjusted = Precipitation-Predicted
 )
 
-hum_piv |> 
-  ggplot(aes(x = Date2, y = Humidity))+
+precip_piv |> 
+  ggplot(aes(x = Date2, y = Precipitation))+
   geom_line()+
   geom_line(aes(y = Adjusted), color = "blue")+
   facet_wrap(vars(Region))+
   geom_smooth(method = lm, color = "red")
 
+precip_piv |> 
+  ggplot(aes(x = Date2, y = Precipitation))+
+  geom_line()+
+  geom_line(aes(y = Adjusted), color = "blue")+
+  facet_wrap(vars(Region))+
+  geom_smooth(method = lm, color = "red")
 
 #not entirely sure I did this right
 #regardless, the point of this was to extract and look at the slopes (which I have)
 #i tried making it stationary so we can rejoin the temp dataset but alas.
 
-#see? we've got slopes!
-
-#NOTES
-#all temp are nonsignificant (stationary)
-#all humidity are somewhat significant (NOT stationary)
-#except for West North Central Region which is the most landlocked?
 ```
 
-deconstructing II (visual time series) - needs vectorized versions
-```{r}
-#regions_list = c("Northeast","East North Central", "Central", "Southeast", "West North Central", "South", "Southwest", "Northwest", "West Region")
-
-for (i in 1:nrow(temp_vec)){
-  temp = unlist(temp_vec$Temperature[i])
-  tempts = ts(temp, frequency = 12, start = 1998)
-  plot(decompose(tempts))
-  axis(1, at = seq(1998, 2020, by = 2))
-  title(main = temp_vec$Region[i])
-  ##title these for our own sanity
-}
-
-
-tester = decompose(tempts)
-tester[3]
-
-model <- lm(Temperature ~ Date2, data = temp_piv)
-# Get predictions
-temp_piv$Trend_Line <- predict(model, newdata = temp_piv)
-
-temp_piv |> 
-  ggplot(aes(x = Date2))+
-  geom_line(aes(y = Temperature))+
-  geom_line(aes(y = Trend_Line),  color = "red")+
-  facet_wrap(vars(Region))
-#test = unlist(temp_vec$Temperature[3])
-#tempts = ts(test, frequency = 12, start = 1998)
-#plot.ts(tempts)
-#plot(decompose(tempts))
-#axis(1, at = seq(1998, 2020, by = 2))
-#plot.ts(SMA(tempts, n = 12))
-
-```
 
 chi test stuff + graph
 ```{r}
@@ -349,8 +471,8 @@ ggsave("./figures/temp_monthly.png")
 # hottest months: june, july, aug
 # coldest months: jan, feb, dec
 
-hum_piv |> 
-  ggplot(aes(x = Month, y = Humidity, color = Year))+
+precip_piv |> 
+  ggplot(aes(x = Month, y = Precipitation, color = Year))+
   geom_point(alpha = 0.5)+
   scale_x_continuous(breaks=seq(1,12,1))+
   facet_wrap(vars(Region))+
@@ -359,7 +481,7 @@ hum_piv |>
 ggsave("./figures/precip_monthly.png")
 
   
-#each region has its own unique humidity pattern
+#each region has its own unique Precipitation pattern
 ```
 
 prepping NORS for proportion comparisons
@@ -589,11 +711,11 @@ temp_piv |>
 # hottest months: june, july, aug
 # coldest months: jan, feb, dec
 
-hum_piv |> 
-  ggplot(aes(x = Month, y = Humidity, color = Year))+
+precip_piv |> 
+  ggplot(aes(x = Month, y = Precipitation, color = Year))+
   geom_point()+
   facet_wrap(vars(Region))+
-  ggtitle("Humidity x Month by Region")+
+  ggtitle("Precipitation x Month by Region")+
   theme(text=element_text(size=12,  family="Palatino Linotype"))
 
 
@@ -613,7 +735,7 @@ NORS_props = NORS_props |>
 
 
 
-# humidity etiology -- disease
+# Precipitation etiology -- disease
 ```
 
 

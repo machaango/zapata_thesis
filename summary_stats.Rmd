@@ -7,11 +7,9 @@ library(tidyverse)
 NORS_alltime = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/NORS_alltime.csv", header = TRUE)
 NORS = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/NORS_refined.csv", header = TRUE)
 NOAA = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/tempdata/temp_reg.csv", header = TRUE)
+NOAA_precip = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/precipdata/temp_reg.csv", header = TRUE)
 
-#keeps reading in the observation number as a column
-#idk why but i'll just delete it manually
-#NOAA$X <- NULL
-#NORS$X <- NULL
+
 ```
 
 NORS observation distributions (preliminary)
@@ -28,7 +26,7 @@ NORS_alltime |> group_by(Year) |>
   geom_vline(xintercept = 1998, linetype = 'dashed', linewidth = 1, color = 'chartreuse3')+
   geom_vline(xintercept = c(1980, 2009, 2020), linetype = 'dashed', linewidth = 1, color = 'darkred')+
   ylab("Outbreak Count")
-ggsave("./figures/histogram_full_labeled.png", height = 4.5, width = 7)
+ggsave("./figures/NORS_histograms/histogram_full_labeled.png", height = 4.5, width = 7)
 #no decent data until 1998
 #data also ends at 2022 but we will cut it off at 2019 to avoid influence from the pandemic
 
@@ -45,7 +43,7 @@ NORS |> group_by(Year) |>
   scale_x_continuous(breaks = c(1998, 2000, 2002, 2004, 2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020), 
                      minor_breaks = NULL)+
   ylab("Outbreak Count")
-ggsave("./figures/histogram_trimmed.png", height = 4.5, width = 7)
+ggsave("./figures/NORS_histograms/histogram_trimmed.png", height = 4.5, width = 7)
 #the amount of reporting is still definitely skewed towards more recent years
 #but we're up to an n that I'm not too worried about it?
 
@@ -58,7 +56,7 @@ NORS |> group_by(Region) |>
   geom_bar(aes(x = Region, weight = n))+
   ylab("Outbreak Count")+
   theme(axis.text.x = element_text(angle = 20, hjust = 1))
-ggsave("./figures/histogram_region_trimmed.png", height = 4.5, width = 7)
+ggsave("./figures/NORS_histograms/histogram_region_trimmed.png", height = 4.5, width = 7)
 
 #tbh i'm not even sure how to go about cleaning this
 #what even are relevant categories to divide by?
@@ -75,7 +73,7 @@ NORS |>
   geom_col()+
   theme(axis.text.x = element_text(angle = 20, hjust = 1))+
   ylab("Outbreak Count")
-ggsave("./figures/histogram_etiology_all.png", height = 4.5, width = 7)
+ggsave("./figures/NORS_histograms/histogram_etiology_all.png", height = 4.5, width = 7)
 
 
 NORS |> 
@@ -87,12 +85,10 @@ NORS |>
   geom_col()+
   theme(axis.text.x = element_text(angle = 20, hjust = 1))+
   ylab("Outbreak Count")
-ggsave("./figures/histogram_etiology_sinNoro.png", height = 4.5, width = 7)
+ggsave("./figures/NORS_histograms/histogram_etiology_sinNoro.png", height = 4.5, width = 7)
 
 
 ```
-
-
 
 NOAA observations distributions
 ```{r}
