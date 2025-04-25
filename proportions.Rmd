@@ -1,1 +1,354 @@
-working on this
+```{r}
+library(dplyr)
+library(tidyverse)
+
+library(ggplot2)
+library(knitr)
+library(extrafont)
+library(viridis)
+```
+
+
+load in data
+```{r}
+temper = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/tempdata/temp_reg.csv", header = TRUE)
+precip = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/precipdata/hum_reg.csv", header = TRUE)
+NORS = read.csv("/Users/machaango/OneDrive/Desktop/thesis/zapata_thesis/data/NORS_refined.csv", header = TRUE)
+
+regions_list = c("Central","East North Central", "Northeast", "Northwest", "South", "Southeast", "Southwest", "West", "West North Central")
+
+```
+
+visual theme settings (run only once)
+```{r}
+theme = theme_set(theme_linedraw())
+theme_update(
+  text=element_text(size=12,  family="Palatino Linotype"),
+  panel.grid.major = element_line(
+    linewidth = 0.5, 
+    linetype = 'solid',
+    colour = "grey"),
+  panel.grid.minor = element_line(
+    linewidth = 0.5, 
+    linetype = 'solid',
+    colour = "grey"))
+```
+
+
+chi test stuff + graph
+```{r}
+low_counts = NORS |> group_by(Etiology) |> count() |> arrange(n) |> filter(n < 15)
+low_counts = low_counts$Etiology
+
+low_counts = NORS |> group_by(Etiology) |> count() |> arrange(n) |> filter(n < 30)
+low_counts = low_counts$Etiology
+
+
+chitest_df = NORS |> 
+  group_by(Region, Etiology) |> 
+  count() |> 
+  pivot_wider(names_from = Region, values_from = n, values_fill = 0)
+
+chitest_df = chitest_df |> ungroup() |> select(!(Etiology))
+#https://stats.stackexchange.com/questions/159057/alternatives-for-chi-squared-test-for-independence-for-tables-more-than-2-x-2
+chisq.test(chitest_df, simulate.p.value = TRUE) #the nature of this test means that it's testing the RELATIVE proportion-- it assumes that the spread overall is what matters and not differing expected counts between groups
+#i think that's what that means?
+#regardless it's actually running a fisher's exact test to account for low values
+
+## VISUALS
+## total proportion
+NORS |> filter(!(Etiology %in% low_counts | Etiology == "Norovirus")) |> 
+  ggplot(aes(x = Region, fill = Etiology))+
+  geom_bar(position = "stack")+
+  scale_fill_viridis(discrete = TRUE)
+
+# relative proportion
+NORS |> filter(!(Etiology %in% low_counts|Etiology == "Norovirus")) |> 
+  ggplot(aes(x = Region, fill = Etiology))+
+  geom_bar(position = "fill")+
+  scale_fill_viridis(discrete = TRUE)
+
+
+rm(low_counts, chitest_df)
+```
+
+checking hot/cold months
+```{r}
+temp_piv |> 
+  ggplot(aes(x = Month, y = Temperature, color = Year))+
+  geom_point(alpha = 0.5)+
+  scale_x_continuous(breaks=seq(1,12,1))+
+  facet_wrap(vars(Region))+
+  labs(title = "Monthly Temperature (°F) by Region")+
+  scale_color_viridis(option="viridis")
+#ggsave("./figures/temp_monthly.png")
+# hottest months: june, july, aug
+# coldest months: jan, feb, dec
+
+precip_piv |> 
+  ggplot(aes(x = Month, y = Precipitation, color = Year))+
+  geom_point(alpha = 0.5)+
+  scale_x_continuous(breaks=seq(1,12,1))+
+  facet_wrap(vars(Region))+
+  labs(title = "Monthly Precipitation (inches) by Region")+
+  scale_color_viridis(option="viridis")
+#ggsave("./figures/precip_monthly.png")
+
+  
+#each region has its own unique Precipitation pattern
+```
+
+prepping NORS for proportion comparisons
+```{r}
+#NORS |> filter(!(Etiology %in% low_counts | Etiology == "Norovirus")) |> group_by(Etiology) |> count()
+#NORS|> group_by(Etiology) |> count()
+low_counts = NORS |> group_by(Etiology) |> count() |> arrange(n) |> filter(n < 15)
+low_counts = low_counts$Etiology
+
+NORS2 = NORS |> 
+  select(c(Year, Month, Region, Etiology)) |> 
+  mutate(Type = "low count",
+         Special_Temp = "none", 
+         Section = 0)
+NORS2 = numMonth(NORS2)
+NORS2 = NORS2 |> rename(Date = Date2)
+
+for (i in 1:nrow(NORS2)){
+  if (NORS2$Month[i] <= 8 & NORS2$Month[i] >= 6){
+    NORS2$Special[i] =  "hot"
+  }
+  if (NORS2$Month[i] <= 2 | NORS2$Month[i] == 12){
+    NORS2$Special[i] = "cold"
+  }
+}
+
+for (i in 1:nrow(NORS2)){
+  if (NORS2$Month[i] <= 8 & NORS2$Month[i] >= 6){
+    NORS2$Special[i] =  "hot"
+  }
+  if (NORS2$Month[i] <= 2 | NORS2$Month[i] == 12){
+    NORS2$Special[i] = "cold"
+  }
+}
+
+
+for (i in 1:nrow(NORS2)){
+  if (NORS2$Etiology[i] == "Acanthamoeba"){
+    NORS2$Type[i] = "Parasite/Amoeba"
+  }
+  else if (NORS2$Etiology[i] == "Adenovirus"){
+    NORS2$Type[i] = "Virus"
+  }
+  else if (NORS2$Etiology[i] == "Anisakis"){
+    NORS2$Type[i] = "Parasite/Amoeba"
+  }
+  else if (NORS2$Etiology[i] == "Astrovirus"){
+    NORS2$Type[i] = "Virus"
+  }
+  else if (NORS2$Etiology[i] == "Bacillus"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Brucella"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Campylobacter"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Clostridium"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Cryptosporidium"){
+    NORS2$Type[i] = "Parasite/Amoeba"
+  }
+  else if (NORS2$Etiology[i] == "Cyclospora"){
+    NORS2$Type[i] = "Parasite/Amoeba"
+  }
+  else if (NORS2$Etiology[i] == "Enterobacter"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Enterococcus"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Escherichia"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Giardia"){
+    NORS2$Type[i] = "Parasite/Amoeba"
+  }
+  else if (NORS2$Etiology[i] == "Hepatovirus "){
+    NORS2$Type[i] = "Virus"
+  }
+  else if (NORS2$Etiology[i] == "Legionella"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Leptospira"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Listeria"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Microcystis"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Mycobacterium"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Naegleria"){
+    NORS2$Type[i] = "Parasite/Amoeba"
+  }
+  else if (NORS2$Etiology[i] == "Norovirus"){
+    NORS2$Type[i] = "Virus"
+  }
+  else if (NORS2$Etiology[i] == "Pantoea"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Plesiomonas"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Providencia"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Pseudomonas"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Rotavirus"){
+    NORS2$Type[i] = "Virus"
+  }
+  else if (NORS2$Etiology[i] == "Salmonella"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Sapovirus"){
+    NORS2$Type[i] = "Virus"
+  }
+  else if (NORS2$Etiology[i] == "Shigella"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Staphylococcus"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Streptococcus"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Toxoplasma"){
+    NORS2$Type[i] = "Parasite/Amoeba"
+  }
+  else if (NORS2$Etiology[i] == "Trichinella"){
+    NORS2$Type[i] = "Parasite/Amoeba"
+  }
+  else if (NORS2$Etiology[i] == "Vibrio"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else if (NORS2$Etiology[i] == "Yersinia"){
+    NORS2$Type[i] = "Bacteria"
+  }
+  else{
+    message(NORS2$Etiology[i])
+  }
+}
+
+
+NORS_lite = NORS2 |> filter(!(Etiology %in% low_counts | Etiology == "Norovirus"))
+
+
+message("all done!")
+```
+
+
+proportions by year and region
+```{r}
+#example of formatted stuff
+temp_piv |> 
+  ggplot(aes(x = Month, y = Temperature, color = Year))+
+  geom_point(alpha = 0.5)+
+  scale_x_continuous(breaks=seq(1,12,1))+
+  facet_wrap(vars(Region))+
+  labs(title = "Monthly Temperature (°F) by Region")+
+  scale_color_viridis(option="viridis")
+ggsave("./figures/temp_monthly.png")
+# in this case we can't drop the loest etiologies because of how the disease is working-- many different types of virus make up the cold season but most hot month infections are caused by the same pathogen
+# also. several amoeba groups are like. sort of parasitic sort of not (parasite has its own definition) but they have been grouped here 
+
+# HOT/COLD x TYPE
+NORS2 |> filter(Special != "none") |> 
+  ggplot(aes(x = Special, fill = Type))+
+  geom_bar(position = "stack")+
+  facet_wrap(vars(Region))
+
+NORS_lite |> filter(Special != "none") |> 
+  ggplot(aes(x = Special, fill = Type))+
+  geom_bar(position = "stack")+
+  facet_wrap(vars(Region))
+
+
+# HOT/COLD x ETIOLOGY (stacked)
+NORS2 |> filter(Special != "none") |> 
+  ggplot(aes(x = Special, fill = Etiology))+
+  geom_bar(position = "stack")+
+  facet_wrap(vars(Region))
+
+NORS_lite |> filter(Special != "none") |> 
+  ggplot(aes(x = Special, fill = Etiology))+
+  geom_bar(position = "stack")+
+  facet_wrap(vars(Region))
+
+# HOT/COLD x ETIOLOGY (proportion)
+NORS2 |> filter(Special != "none") |> 
+  ggplot(aes(x = Special, fill = Etiology))+
+  geom_bar(position = "fill")+
+  facet_wrap(vars(Region))
+
+NORS_lite |> filter(Special != "none") |> 
+  ggplot(aes(x = Special, fill = Etiology))+
+  geom_bar(position = "fill")+
+  facet_wrap(vars(Region))
+
+
+
+
+NORS2 |> 
+  ggplot(aes(x = Month, fill = Type))+
+  geom_bar(position = "stack")+
+  facet_wrap(vars(Region))+
+  ggtitle("Type x Month by Region (full)")
+
+NORS_lite |> 
+  ggplot(aes(x = Month, fill = Type))+
+  geom_bar(position = "stack")+
+  facet_wrap(vars(Region))+
+  ggtitle("Type x Month by Region (lite)")
+
+temp_piv |> 
+  ggplot(aes(x = Month, y = Temperature, color = Year))+
+  geom_point()+
+  facet_wrap(vars(Region))+
+  ggtitle("Temperature x Month by Region")
+# hottest months: june, july, aug
+# coldest months: jan, feb, dec
+
+precip_piv |> 
+  ggplot(aes(x = Month, y = Precipitation, color = Year))+
+  geom_point()+
+  facet_wrap(vars(Region))+
+  ggtitle("Precipitation x Month by Region")+
+  theme(text=element_text(size=12,  family="Palatino Linotype"))
+
+
+```
+
+
+```{r}
+NORS_props = NORS2 |> group_by(Year, Region, Etiology) |> add_count()
+NORS_props = NORS_props |> 
+  ungroup() |> 
+  group_by(Year, Region) |> 
+  add_count(wt = n) |> 
+  rename(indiv_count = n,
+         total_count = nn) |> 
+  mutate(prop = indiv_count/total_count)
+
+
+
+
+# Precipitation etiology -- disease
+```
+
